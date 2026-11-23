@@ -203,7 +203,8 @@ Antes de una instalación: prueba de arranque en frío y prueba solo con 4G (sec
   en otras condiciones. Cambio de firmware aplazado.
 - Recalibrar el SCD30 al aire libre (marcó unos 320 ppm en laboratorio) y validar T-base y umbrales con El Trigal.
 - Cambiar el *Max* del panel "Datos 4G este mes" al tamaño real del paquete.
-- El manual dice que este repositorio es privado; confirmar su visibilidad en GitHub (Settings → General → Danger Zone).
+- El repositorio está público desde el 23-nov-2026 por unos días, para que el profesor lo revise; después se vuelve privado
+  (Settings → General → Danger Zone → Change visibility). Mientras sea público, con más razón no subir nada sensible.
 - Recomendaciones para una siguiente versión: RTC DS3231, alertas por Telegram o correo, respaldo semanal programado.
 
 ## Cómo trabajar en este repositorio

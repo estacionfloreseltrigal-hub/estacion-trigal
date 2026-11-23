@@ -44,7 +44,7 @@ Este documento reúne todo lo necesario para entender, operar, modificar y repar
 | Tópicos MQTT | `trigal/estacion1` |
 | Fotos automáticas | 4:00, 12:00 y 20:00, con luz blanca y UV |
 | Operador móvil | Claro, APN `internet.comcel.com.co` |
-| Código fuente | github.com/estacionfloreseltrigal-hub/estacion-trigal (privado; sección 14) |
+| Código fuente | github.com/estacionfloreseltrigal-hub/estacion-trigal (público unos días para la revisión del profesor y después privado; sección 14) |
 
 **Contraseñas:** este manual dice qué usuario usa cada servicio, pero no incluye ninguna clave. Las claves se entregan aparte en la bóveda de Bitwarden "Estación Trigal". En los comandos, todo lo que va entre `< >` o en mayúsculas (por ejemplo `NUEVA_CLAVE`) se reemplaza por el valor real.
 
@@ -1421,7 +1421,7 @@ El archivo `configuracion.tgz` contiene claves y tokens: guardarlo solo en lugar
 
 ### Código fuente: repositorio `estacion-trigal`
 
-Todo el código del proyecto está en el repositorio privado de GitHub **[estacionfloreseltrigal-hub/estacion-trigal](https://github.com/estacionfloreseltrigal-hub/estacion-trigal)**, de la cuenta del proyecto. Este manual es su documentación. Para descargarlo completo: en la página del repositorio, Code → Download ZIP (con una cuenta que tenga acceso), o `git clone https://github.com/estacionfloreseltrigal-hub/estacion-trigal`.
+Todo el código del proyecto está en el repositorio de GitHub **[estacionfloreseltrigal-hub/estacion-trigal](https://github.com/estacionfloreseltrigal-hub/estacion-trigal)**, de la cuenta del proyecto. Desde el 23-nov-2026 está público por unos días para que el profesor lo revise; después se vuelve privado (Settings → General → Danger Zone → Change visibility). Este manual es su documentación. Para descargarlo completo: en la página del repositorio, Code → Download ZIP (con una cuenta que tenga acceso), o `git clone https://github.com/estacionfloreseltrigal-hub/estacion-trigal`.
 
 | Carpeta | Qué contiene | Dónde va en la Pi |
 | --- | --- | --- |
