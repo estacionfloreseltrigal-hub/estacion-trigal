@@ -16,7 +16,7 @@ Sensores → ESP32-S3 ──USB── Raspberry Pi 4 ── Mosquitto → Node-R
 | --- | --- | --- |
 | `docs/` | Manual técnico completo y guías (4G, operación, índices, descargas) | — |
 | `firmware/` | Código de la ESP32-S3 (`PAYLOAD/PAYLOAD.ino`) | Se carga con Arduino IDE |
-| `raspberry/app/` | Puente ESP32 → MQTT (`serial_mqtt.py`) y ejemplos de `trigal.env` e `influx-sistema.env` | `/opt/trigal/app/` |
+| `raspberry/app/` | Puente ESP32 → MQTT (`serial_mqtt.py`), prueba del puerto serial (`prueba_serial.py`) y ejemplos de `trigal.env` e `influx-sistema.env` | `/opt/trigal/app/` |
 | `raspberry/camara/` | Servidor de cámara y fotos (FastAPI) | `/home/trigal/fastapi-cam/` |
 | `raspberry/bin/` | `revisar-estacion`, `prueba-final`, `esperar-hora`, `lte-watchdog.sh`, `fotos-nube.sh`, `metricas-sistema` | `/usr/local/bin/` |
 | `raspberry/systemd/` | Servicios y temporizadores | `/etc/systemd/system/` |
@@ -27,7 +27,7 @@ Sensores → ESP32-S3 ──USB── Raspberry Pi 4 ── Mosquitto → Node-R
 | `influxdb/` | Tarea `indices_diarios` (Tmáx, Tmín, DLI, fotoperiodo) | InfluxDB → Tasks |
 | `grafana/dashboards/` | Tableros *Estación Trigal* y *Estación Trigal - Administración* | Grafana → Import |
 
-Qué archivo viene de dónde y cómo se comparó con la Pi: [`RESCATE.md`](RESCATE.md). Contenedores que corren: `docker/contenedores.txt`.
+Todo el contenido se comparó con la Pi `rpi4trigal` el 23-nov-2026: lo que está aquí es lo que corre en la estación.
 
 La instalación desde cero, los accesos, el uso del tablero y la solución de problemas están en
 [`docs/manual-tecnico.md`](docs/manual-tecnico.md) (sección 14: respaldo y reinstalación).
@@ -47,15 +47,16 @@ Las claves de El Trigal se guardan en su gestor de contraseñas, no aquí.
 
 ## Actualizar el repositorio con lo que tiene la Pi
 
-El script `recolectar-desde-la-pi.sh` copia las versiones actuales de la Pi a esta carpeta y quita las claves:
+Después de cambiar algo en la Pi (flujos, tableros, scripts), `recolectar-desde-la-pi.sh` copia las versiones
+actuales a `~/estacion-trigal/`, quita las claves y deja `~/estacion-trigal.tar.gz`:
 
 ```bash
-scp -r estacion-trigal trigal@10.10.80.48:~/      # desde el PC
-ssh trigal@10.10.80.48
-cd ~/estacion-trigal && bash recolectar-desde-la-pi.sh
+bash ~/estacion-trigal/recolectar-desde-la-pi.sh
+rclone copy ~/estacion-trigal.tar.gz drive:EstacionTrigal/repositorio    # por 4G / Pi Connect
 ```
-Al final revisa que no queden claves y deja `~/estacion-trigal.tar.gz` listo para traer al PC:
-`scp trigal@10.10.80.48:~/estacion-trigal.tar.gz .`
+
+Con SSH en la misma red también sirve `scp trigal@10.10.80.48:~/estacion-trigal.tar.gz .`. Luego se descomprime
+encima de este repositorio, se revisa con `git diff` y se sube.
 
 ## Equipo
 

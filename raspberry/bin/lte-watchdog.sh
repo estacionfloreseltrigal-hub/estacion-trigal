@@ -1,10 +1,5 @@
 #!/bin/bash
-# Vigilante 4G v2 (11 nov 2026): revisa internet por IPv4 e IPv6 y solo actua tras 3 revisiones seguidas sin red.
-# Ruta en la Pi: /usr/local/bin/lte-watchdog.sh  (sudo chmod +x)
-# Cambios frente a v1:
-#  - v1 solo probaba ping IPv4 a 8.8.8.8; el 4G de Claro solo tenia IPv6 funcionando, asi que v1 creia que no
-#    habia red y ejecutaba "nmcli connection up claro4g" cada 5 min, cortando usb0 y el tunel (Error 1033).
-#  - v1 enviaba AT+CRESET a /dev/ttyUSB2, que en modo RNDIS es el puerto NMEA del GPS. El puerto AT es if04.
+# Vigilante 4G v2: revisa internet por IPv4 e IPv6 y solo actua tras 3 revisiones seguidas sin red.
 IF=usb0
 STATE=/run/lte-watchdog.fails
 PORT=/dev/serial/by-id/usb-SimTech__Incorporated_SimTech__Incorporated_0123456789ABCDEF-if04-port0

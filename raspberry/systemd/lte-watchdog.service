@@ -1,4 +1,3 @@
-# Ruta en la Pi: /etc/systemd/system/lte-watchdog.service
 [Unit]
 Description=Vigilante conexion 4G Claro
 

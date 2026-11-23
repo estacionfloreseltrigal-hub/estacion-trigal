@@ -1,7 +1,0 @@
-# Contenedores en la Pi el 2026-11-23
-grafana	grafana/grafana-enterprise	Up 45 hours
-cloudflared	cloudflare/cloudflared:latest	Up 45 hours
-influxdb	influxdb:2	Up 45 hours
-node-red	nodered/node-red:latest	Up 45 hours (healthy)
-mosquitto	eclipse-mosquitto:2	Up 45 hours
-portainer	portainer/portainer-ce:latest	Up 45 hours

@@ -24,7 +24,6 @@ copiar() {   # copiar <origen> <destino>
     FALTAN+=("$1")
   fi
 }
-es_texto() { $SUDO grep -Iq . "$1" 2>/dev/null; }
 
 echo "Recolectando en $REPO"
 $SUDO true || { echo "Se necesita sudo"; exit 1; }
@@ -38,32 +37,25 @@ for d in "$RAIZ"/etc/systemd/system/{trigal-serial,camara,fotos-nube}.service.d;
   [ -d "$d" ] && for f in "$d"/*.conf; do copiar "$f" "$REPO/raspberry/systemd/$(basename "$d")/$(basename "$f")"; done
 done
 
-# 2. Scripts de /usr/local/bin (solo archivos de texto)
+# 2. Scripts de /usr/local/bin
 echo "2. Scripts de /usr/local/bin"
-for f in "$RAIZ"/usr/local/bin/*; do
-  [ -f "$f" ] && es_texto "$f" && copiar "$f" "$REPO/raspberry/bin/$(basename "$f")"
+for f in revisar-estacion prueba-final esperar-hora lte-watchdog.sh fotos-nube.sh metricas-sistema; do
+  copiar "$RAIZ/usr/local/bin/$f" "$REPO/raspberry/bin/$f"
 done
 chmod +x "$REPO"/raspberry/bin/* 2>/dev/null
 
-# 3. Puente ESP32 -> MQTT (/opt/trigal/app), sin los .env
+# 3. Puente ESP32 -> MQTT (/opt/trigal/app). Los .env no se copian: el repositorio tiene sus ejemplos.
 echo "3. Puente serial"
-for f in "$RAIZ"/opt/trigal/app/*; do
-  case "$(basename "$f")" in *.env|*.env.*|__pycache__) continue;; esac
-  [ -f "$f" ] && es_texto "$f" && copiar "$f" "$REPO/raspberry/app/$(basename "$f")"
-done
-if $SUDO test -r "$ENV"; then   # ejemplo del .env con las claves vacías
-  $SUDO sed -E 's/^([A-Za-z_]*(PASS|CLAVE|TOKEN|SECRET|KEY)[A-Za-z_]*=).*/\1<poner aquí>/' "$ENV" > "$REPO/raspberry/app/trigal.env.ejemplo"
+for f in serial_mqtt.py prueba_serial.py; do copiar "$RAIZ/opt/trigal/app/$f" "$REPO/raspberry/app/$f"; done
+if $SUDO test -r "$ENV"; then   # avisa si trigal.env tiene variables que el ejemplo no menciona
+  for k in $($SUDO grep -oE '^[A-Za-z_]+=' "$ENV" | tr -d =); do
+    grep -q "$k" "$REPO/raspberry/app/trigal.env.ejemplo" || echo "   ⚠️  $k está en trigal.env y falta en trigal.env.ejemplo"
+  done
 fi
 
-# 4. Cámara (fastapi-cam): código, sin entorno virtual, fotos ni .git
+# 4. Cámara: solo main.py (requirements.txt se mantiene en el repositorio)
 echo "4. Cámara"
-if [ -d "$CAM" ]; then
-  mkdir -p "$REPO/raspberry/camara"
-  tar -C "$CAM" --exclude=.venv --exclude=venv --exclude=.git --exclude=__pycache__ --exclude='*.pyc' \
-      --exclude='*.env' --exclude='*.jpg' --exclude='*.jpeg' --exclude='*.mp4' --exclude=fotos \
-      -cf - . 2>/dev/null | tar -C "$REPO/raspberry/camara" -xf -
-  COPIADOS=$((COPIADOS+1))
-else FALTAN+=("$CAM"); fi
+copiar "$CAM/main.py" "$REPO/raspberry/camara/main.py"
 
 # 5. Regla udev de la ESP32 y registros persistentes
 echo "5. udev y journald"
@@ -72,21 +64,22 @@ for f in "$RAIZ"/etc/systemd/journald.conf.d/*.conf; do [ -f "$f" ] && copiar "$
 
 # 6. Docker: archivos YML de cada contenedor y mosquitto.conf (nunca el archivo passwd)
 echo "6. Docker"
-for f in "$RAIZ"/opt/trigal/stacks/*.yml "$RAIZ"/opt/trigal/stacks/*.yaml; do [ -f "$f" ] && copiar "$f" "$REPO/docker/stacks/$(basename "$f")"; done
+for f in "$RAIZ"/opt/trigal/stacks/*.yml "$RAIZ"/opt/trigal/stacks/*.yaml; do   # los vacíos no se copian
+  $SUDO test -s "$f" && copiar "$f" "$REPO/docker/stacks/$(basename "$f")"
+done
 copiar "$RAIZ/opt/trigal/mosquitto/config/mosquitto.conf" "$REPO/docker/mosquitto/mosquitto.conf"
-if [ -z "$RAIZ" ] && command -v docker >/dev/null; then
-  { echo "# Contenedores en la Pi el $(date '+%F')"; docker ps -a --format '{{.Names}}\t{{.Image}}\t{{.Status}}'; } \
-    > "$REPO/docker/contenedores.txt" 2>/dev/null
-fi
 
 # 7. Node-RED: flujos, paquetes instalados y settings.js (sin flows_cred.json)
 echo "7. Node-RED"
-for f in "$NR"/flows*.json; do
-  case "$f" in *_cred*|*.backup) continue;; esac
-  [ -f "$f" ] && copiar "$f" "$REPO/node-red/$(basename "$f")"
-done
+copiar "$NR/flows.json" "$REPO/node-red/flows.json"
 copiar "$NR/package.json" "$REPO/node-red/package.json"
-copiar "$NR/settings.js" "$REPO/node-red/settings.js"
+if $SUDO test -f "$NR/settings.js"; then   # sin los comentarios de la plantilla de Node-RED
+  $SUDO cat "$NR/settings.js" | python3 -c '
+import re, sys
+s = re.sub(r"/\*.*?\*/", "", sys.stdin.read(), flags=re.S)
+print("\n".join(l.rstrip() for l in s.split("\n") if l.strip() and not l.lstrip().startswith("//")))
+' > "$REPO/node-red/settings.js" && COPIADOS=$((COPIADOS+1))
+else FALTAN+=("$NR/settings.js"); fi
 
 # 8. InfluxDB: la tarea indices_diarios tal como está guardada
 echo "8. InfluxDB"

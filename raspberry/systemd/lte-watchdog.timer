@@ -1,4 +1,3 @@
-# Ruta en la Pi: /etc/systemd/system/lte-watchdog.timer
 [Unit]
 Description=Ejecuta el vigilante 4G cada 5 minutos
 

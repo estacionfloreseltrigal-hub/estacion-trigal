@@ -1421,13 +1421,13 @@ Todo el código del proyecto está en el repositorio privado de GitHub **[estaci
 | `raspberry/udev/` | `99-esp32.rules` | `/etc/udev/rules.d/` |
 | `raspberry/sistema/` | `50-persistente.conf` (registros persistentes) | `/etc/systemd/journald.conf.d/` |
 | `docker/` | YML de cada contenedor y `mosquitto.conf` | `/opt/trigal/stacks/` y `/opt/trigal/mosquitto/config/` |
-| `node-red/` | Flujos exportados | Se importan desde el editor de Node-RED |
+| `node-red/` | `flows.json`, `settings.js` (sin hashes) y `package.json` | `/opt/trigal/nodered/data/` |
 | `influxdb/` | `indices_diarios.flux` | InfluxDB → Tasks |
 | `grafana/dashboards/` | Dashboards exportados | Grafana → Dashboards → Import |
 
-- **La versión que vale es la de la Pi.** Parte del código se reconstruyó a partir de las conversaciones de trabajo; el archivo `RESCATE.md` del repositorio dice de dónde salió cada archivo y qué tan confiable es.
+- **La versión que vale es la de la Pi.** El repositorio se comparó archivo por archivo con la Pi el 23 de noviembre de 2026.
 - El `PAYLOAD.ino` del repositorio es el mismo que está cargado en la ESP32 (comparados el 22 de noviembre de 2026). Los archivos de la sección 17 son copia de la carpeta `raspberry/` del repositorio.
-- Al entregar faltaban en el repositorio los flujos de ciclos y descargas de Node-RED y los dos dashboards de Grafana. Para completarlo: copiar la carpeta del repositorio a la Pi y ejecutar ahí `bash recolectar-desde-la-pi.sh`, que copia todo y quita las claves. También se pueden exportar a mano: Node-RED → ☰ → Exportar → Todos los flujos; en Grafana, en cada dashboard, Export → Export as JSON.
+- Después de cambiar algo en la Pi, actualizar el repositorio con `bash ~/estacion-trigal/recolectar-desde-la-pi.sh`: copia flujos, dashboards, scripts y servicios, quita las claves y deja `~/estacion-trigal.tar.gz` para subir (por Pi Connect: `rclone copy ~/estacion-trigal.tar.gz drive:EstacionTrigal/repositorio`).
 - Nunca subir `trigal.env`, `influx-sistema.env`, `passwd`, `rclone.conf`, `flows_cred.json` ni tokens. El `.gitignore` del repositorio ya los bloquea, y el script reemplaza los hashes de `settings.js`.
 - Después de cada cambio en la Pi o en el firmware, subir los archivos nuevos con un mensaje que diga qué cambió y anotarlo en el registro de cambios (sección 15).
 
@@ -1567,7 +1567,7 @@ El token del túnel está en one.dash.cloudflare.com → *Tunnels* → `rpi4trig
 
 **8. Puente ESP32.** Copiar `serial_mqtt.py` y `trigal.env` a `/opt/trigal/app/` (`chmod 600 trigal.env`), la regla `99-esp32.rules` a `/etc/udev/rules.d/` (`sudo udevadm control --reload && sudo udevadm trigger`), y `esperar-hora` a `/usr/local/bin/` con su `esperar-hora.conf` en `/etc/systemd/system/trigal-serial.service.d/`. Instalar `trigal-serial.service` y `sudo systemctl enable --now trigal-serial`.
 
-**9. Cámara.** Clonar el repositorio `fastapi-cam` del docente en `/home/trigal/fastapi-cam`, crear el entorno (`python3 -m venv .venv` y `.venv/bin/pip install -r requirements.txt paho-mqtt`), copiar el `main.py` del proyecto, instalar `camara.service` y `sudo systemctl enable --now camara`. Si falta `libGL`: `sudo apt install -y libgl1`.
+**9. Cámara.** Copiar `main.py` y `requirements.txt` de `raspberry/camara/` del repositorio a `/home/trigal/fastapi-cam`, crear el entorno (`python3 -m venv .venv` y `.venv/bin/pip install -r requirements.txt`), instalar `camara.service` y `sudo systemctl enable --now camara`. Si falta `libGL`: `sudo apt install -y libgl1`.
 
 **10. Fotos a Drive.** `rclone config` → `n` → nombre `drive` → tipo `drive` → `client_id` y `client_secret` vacíos → scope `3` → autorizar con la cuenta del proyecto (sección 12). Instalar `fotos-nube.sh`, `.service` y `.timer` y `sudo systemctl enable --now fotos-nube.timer`.
 
@@ -1711,7 +1711,7 @@ RestartSec=5
 WantedBy=multi-user.target
 ```
 
-`/etc/systemd/system/trigal-serial.service.d/esperar-hora.conf` (hace que el puente espere la hora antes de arrancar; este archivo se reconstruyó, así que conviene compararlo con `systemctl cat trigal-serial` en la Pi):
+`/etc/systemd/system/trigal-serial.service.d/esperar-hora.conf` (hace que el puente espere la hora antes de arrancar):
 
 ```ini
 [Service]

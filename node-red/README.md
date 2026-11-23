@@ -3,7 +3,7 @@
 | Archivo | Qué es |
 | --- | --- |
 | `flows.json` | Todos los flujos, copiados de la Pi el 23-nov-2026. Pestañas: **Estación Trigal** (datos → DPV y punto de rocío → InfluxDB, órdenes a los LEDs), **Ciclos del cultivo** (`/ciclo`) y **Consulta y descarga** (`/descarga`). |
-| `settings.js` | Configuración de Node-RED. Los hashes de las claves (`adminAuth` y `httpNodeAuth` de `admin_trigal`) van como `<HASH_BCRYPT>`. |
+| `settings.js` | Configuración de Node-RED (solo los valores en uso). Los hashes de las claves de `admin_trigal` van como `<HASH_BCRYPT>`. |
 | `package.json` | Nodos instalados: `node-red-contrib-influxdb` y `@flowfuse/node-red-dashboard`. |
 
 Todo va en `/opt/trigal/nodered/data/` en la Pi.

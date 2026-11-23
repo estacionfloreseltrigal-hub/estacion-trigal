@@ -1,19 +1,18 @@
 #!/usr/bin/env python3
 """
-Prueba 1 - Estación Trigal: ¿llegan bien los datos de la ESP32 por USB?
+Prueba del puerto serial ESP32 -> Raspberry (Estación Trigal).
 
-Lee el puerto serial durante N segundos, valida cada línea como JSON y al final
-muestra un resumen: líneas válidas, inválidas, tipos recibidos y paquetes perdidos
-(según el contador "seq"). Con --ping también prueba el sentido Raspberry -> ESP32.
+Lee el puerto durante N segundos y muestra cada línea: tramas $EST, avisos (#OK, #ERR, Estado:)
+y líneas que no se entienden. Con --ping también prueba el sentido Raspberry -> ESP32.
+La ESP32 envía una trama cada 60 s, por eso la prueba dura 75 s por defecto.
 
-Uso:
-    python3 prueba_serial.py                 # detecta el puerto solo, 30 s
-    python3 prueba_serial.py --segundos 60 --ping
-    python3 prueba_serial.py --puerto /dev/ttyUSB0
+Antes de correrla hay que detener el puente, que ocupa el puerto:
+    sudo systemctl stop trigal-serial
+    python3 /opt/trigal/app/prueba_serial.py --ping
+    sudo systemctl start trigal-serial
 """
 import argparse
 import glob
-import json
 import os
 import sys
 import time
@@ -71,9 +70,9 @@ def buscar_puerto_esp():
 
 def main():
     ap = argparse.ArgumentParser(description="Prueba de lectura serial ESP32 -> Raspberry")
-    ap.add_argument("--puerto", help="ej. /dev/ttyACM0 (si se omite, se detecta)")
+    ap.add_argument("--puerto", help="ej. /dev/esp32 (si se omite, se detecta)")
     ap.add_argument("--baudios", type=int, default=115200)
-    ap.add_argument("--segundos", type=int, default=30)
+    ap.add_argument("--segundos", type=int, default=75)
     ap.add_argument("--ping", action="store_true", help="envía {\"cmd\":\"ping\"} y espera respuesta")
     args = ap.parse_args()
 
@@ -94,10 +93,7 @@ def main():
     time.sleep(2.5)
     ser.reset_input_buffer()
 
-    total = validas = invalidas = 0
-    por_tipo = {}
-    ultimo_seq = None
-    perdidos = 0
+    total = tramas = incompletas = avisos = otras = 0
     ping_enviado = ping_ok = False
     t_ping = 0.0
     inicio = time.time()
@@ -106,7 +102,7 @@ def main():
         if args.ping and not ping_enviado and time.time() - inicio > 8:
             ser.write(b'{"cmd":"ping"}\n')
             ping_enviado, t_ping = True, time.time()
-            print(">> enviado a la ESP32: {\"cmd\":\"ping\"}")
+            print('>> enviado a la ESP32: {"cmd":"ping"}')
 
         crudo = ser.readline()
         if not crudo:
@@ -114,57 +110,36 @@ def main():
         total += 1
         texto = crudo.decode("utf-8", errors="replace").strip()
 
-        # Trama de la ESP32 y avisos (#OK, #ERR, Estado:)
-        if texto.startswith("$EST") or texto.startswith("#") or texto.startswith("Estado:"):
-            validas += 1
-            tipo = "EST" if texto.startswith("$EST") else "aviso"
-            por_tipo[tipo] = por_tipo.get(tipo, 0) + 1
+        if texto.startswith("$EST"):
+            if "vent=" in texto:              # la trama completa termina con vent, luz, scd y tsl
+                tramas += 1
+                print(f"   [EST     ] {texto}")
+            else:
+                incompletas += 1
+                print(f"   [EST INCOMPLETA] {texto}")
+        elif texto.startswith(("#", "Estado:")):
+            avisos += 1
             if texto.startswith("#OK,ping"):
                 ping_ok = True
                 print(f"<< respuesta de la ESP32 en {(time.time() - t_ping) * 1000:.0f} ms: {texto}")
             else:
-                print(f"   [{tipo:8}] {texto}")
-            continue
-
-        try:
-            dato = json.loads(texto)
-            if not isinstance(dato, dict):
-                raise ValueError("no es un objeto JSON")
-        except ValueError:
-            invalidas += 1
-            print(f"   [NO VALE] {texto!r}")
-            continue
-
-        validas += 1
-        tipo = dato.get("t", "?")
-        por_tipo[tipo] = por_tipo.get(tipo, 0) + 1
-
-        seq = dato.get("seq")
-        if isinstance(seq, int) and tipo == "ambiente":
-            if ultimo_seq is not None and seq > ultimo_seq + 1:
-                perdidos += seq - ultimo_seq - 1
-                print(f"   [AVISO] se saltó de seq {ultimo_seq} a {seq}")
-            ultimo_seq = seq
-
-        if tipo == "resp" and dato.get("cmd") == "ping":
-            ping_ok = True
-            print(f"<< respuesta de la ESP32 en {(time.time() - t_ping) * 1000:.0f} ms: {texto}")
+                print(f"   [aviso   ] {texto}")
         else:
-            print(f"   [{tipo:8}] {texto}")
+            otras += 1
+            print(f"   [otra    ] {texto!r}")
 
     ser.close()
 
     print("\n========== RESUMEN ==========")
-    print(f"Puerto:            {puerto}")
-    print(f"Líneas recibidas:  {total}")
-    print(f"Líneas válidas:    {validas}")
-    print(f"Líneas inválidas:  {invalidas}")
-    print(f"Por tipo:          {por_tipo}")
-    print(f"Paquetes perdidos: {perdidos} (solo con el sketch de prueba JSON)")
+    print(f"Puerto:              {puerto}")
+    print(f"Líneas recibidas:    {total}")
+    print(f"Tramas $EST:         {tramas} completas, {incompletas} incompletas")
+    print(f"Avisos:              {avisos}")
+    print(f"Otras líneas:        {otras}")
     if args.ping:
-        print(f"Ping Pi -> ESP32:  {'OK' if ping_ok else 'SIN RESPUESTA'}")
+        print(f"Ping Pi -> ESP32:    {'OK' if ping_ok else 'SIN RESPUESTA'}")
 
-    bien = validas > 0 and invalidas == 0 and perdidos == 0 and (ping_ok or not args.ping)
+    bien = tramas > 0 and incompletas == 0 and (ping_ok or not args.ping)
     print("RESULTADO:", "✅ comunicación correcta" if bien else "⚠️  revisar (ver detalles arriba)")
     sys.exit(0 if bien else 1)
 

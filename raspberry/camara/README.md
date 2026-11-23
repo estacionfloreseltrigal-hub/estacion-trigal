@@ -1,68 +1,29 @@
-# fastapi-cam
+# Cámara y fotos
 
-A simple FastAPI application for streaming live video from a webcam using OpenCV.
+`main.py` es el servidor de la cámara USB (FastAPI, puerto 3333). Parte del repositorio `fastapi-cam` del docente,
+con estos cambios: la cámara se apaga sola tras `CAM_IDLE` s sin uso, toma fotos con luz blanca y con UV, y exige
+`CAM_CLAVE` cuando se entra desde internet.
 
-## Features
+| Ruta | Qué hace |
+| --- | --- |
+| `/` | Página con el video en vivo |
+| `/video_feed`, `/video_lite` | Video MJPEG (normal y liviano, para 4G) |
+| `/snapshot.jpg`, `/status` | Una foto suelta y el estado de la cámara |
+| `POST /foto` | Toma la foto blanca y la UV (pide las luces a la ESP32 por MQTT) |
+| `/foto/estado`, `/foto/ultima/{blanca,uv}.jpg` | Estado y últimas fotos (las usa Grafana) |
 
-- Streams video from a webcam (`/dev/video0`) in MJPEG format
-- Web interface to view the live stream
-- REST endpoint for direct video feed consumption
+Las fotos se toman solas a las horas de `HORAS_FOTO` (por defecto 04:00, 12:00 y 20:00) y quedan en
+`~/fotos/<automaticas|manuales>/<mes>/`. `fotos-nube.sh` las sube cada hora a Google Drive.
 
-## Requirements
+Desde internet (`cam.trigal-digital.com`), toda ruta debe empezar por `/<CAM_CLAVE>/`; en la red local no se pide.
 
-- Python 3.12+
-- Linux (uses `/dev/video0` for webcam)
+## Instalación en la Pi
 
-## Installation
-
-1. **Clone the repository:**
-   ```zsh
-   git clone https://github.com/dvelaren/fastapi-cam.git
-   cd fastapi-cam
-   ```
-2. **(Recommended) Create a virtual environment:**
-   ```zsh
-   python3.12 -m venv .venv
-   source .venv/bin/activate
-   ```
-3. **Install dependencies:**
-   ```zsh
-   pip install -r requirements.txt
-   # or, if using pyproject.toml:
-   pip install .
-   ```
-   Or with [uv](https://github.com/astral-sh/uv):
-   ```zsh
-   uv pip install -r requirements.txt
-   ```
-
-## Usage
-
-Start the FastAPI server with Uvicorn:
-
-```zsh
-uvicorn main:app --reload
+```bash
+mkdir -p ~/fastapi-cam && cp main.py requirements.txt ~/fastapi-cam/ && cd ~/fastapi-cam
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+sudo apt install -y libgl1        # si OpenCV pide libGL
 ```
 
-- Open your browser and go to [http://localhost:8000](http://localhost:8000) to view the webcam stream.
-- The video feed is available at [http://localhost:8000/video_feed](http://localhost:8000/video_feed) as an MJPEG stream.
-
-## Project Structure
-
-- `main.py` — Main FastAPI application
-- `pyproject.toml` — Project metadata and dependencies
-
-## Endpoints
-
-- `/` — Web page with embedded video stream
-- `/video_feed` — MJPEG video stream endpoint
-
-## Notes
-
-- The app uses `/dev/video0` as the webcam source. Change this in `main.py` if needed.
-- Make sure your user has permission to access the webcam device.
-- Tested on Linux. For Windows/Mac, camera device path and OpenCV backend may need adjustment.
-
-## License
-
-MIT
+Lee la configuración de `/opt/trigal/app/trigal.env` (`MQTT_*`, `ESTACION`, `CAM_CLAVE`, `HORAS_FOTO`; ver
+`raspberry/app/trigal.env.ejemplo`). El servicio es `raspberry/systemd/camara.service`.
