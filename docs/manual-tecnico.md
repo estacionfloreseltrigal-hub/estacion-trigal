@@ -1,10 +1,10 @@
 # Manual técnico – Estación portátil de monitoreo Flores El Trigal
 
-Nov 20, 2026 · @Jayder Andres Juagibioy
+Nov 22, 2026 · @Jayder Andres Juagibioy
 
 ## 1. Cómo usar este manual y datos clave
 
-Este documento reúne todo lo necesario para entender, operar, modificar y reparar la estación portátil de monitoreo para *Antirrhinum majus* (snapdragon) de Flores El Trigal. No depende de otros archivos: cada procedimiento trae sus comandos completos. Proyecto del curso Plataformas de Agricultura Inteligente, Universidad EAFIT, 2026-2.
+Este documento reúne todo lo necesario para entender, operar, modificar y reparar la estación portátil de monitoreo para *Antirrhinum majus* (snapdragon) de Flores El Trigal. Cada procedimiento trae sus comandos completos y los archivos de configuración cortos están en el anexo (sección 17); solo los programas largos (firmware, puente, cámara, flujos y dashboards) están aparte, en el repositorio estacion-trigal. Proyecto del curso Plataformas de Agricultura Inteligente, Universidad EAFIT, 2026-2.
 
 **Para quién es cada parte**
 
@@ -20,6 +20,9 @@ Este documento reúne todo lo necesario para entender, operar, modificar y repar
 | Cambiar tiempos, horarios, umbrales, sensores o paneles | Sección 12 |
 | Revisar que todo funciona o resolver una falla | Sección 13 |
 | Respaldar o reinstalar desde cero | Sección 14 |
+| Construir otra estación igual | Secciones 3 (materiales y conexiones), 4 (firmware), 14 (instalación) y 17 (archivos) |
+| Saber qué significa una palabra técnica | Sección 16 (glosario) |
+| Ver el contenido exacto de un servicio o script de la Pi | Sección 17 |
 
 **Datos clave**
 
@@ -41,16 +44,37 @@ Este documento reúne todo lo necesario para entender, operar, modificar y repar
 | Tópicos MQTT | `trigal/estacion1` |
 | Fotos automáticas | 4:00, 12:00 y 20:00, con luz blanca y UV |
 | Operador móvil | Claro, APN `internet.comcel.com.co` |
+| Código fuente | github.com/estacionfloreseltrigal-hub/estacion-trigal (privado; sección 14) |
 
 **Contraseñas:** este manual dice qué usuario usa cada servicio, pero no incluye ninguna clave. Las claves se entregan aparte en la bóveda de Bitwarden "Estación Trigal". En los comandos, todo lo que va entre `< >` o en mayúsculas (por ejemplo `NUEVA_CLAVE`) se reemplaza por el valor real.
 
 **Convenciones:** "en la Pi" significa en una terminal de la Raspberry Pi (por SSH o por Raspberry Pi Connect, sección 6). Los comandos se pegan **uno a la vez**, sobre todo los que piden contraseña. En `nano`, se guarda con **Ctrl+O** y **Enter**, y se sale con **Ctrl+X**.
 
+**Si es la primera vez que trabaja con estos temas:** lea primero las secciones 2 y 7, y tenga a mano el glosario (sección 16). Para cualquier cambio en la Pi necesita una terminal, que es una ventana donde se escriben órdenes de texto:
+
+- **Desde Windows en la misma red de la Pi:** abrir PowerShell (tecla Windows → escribir `PowerShell` → Enter) y escribir `ssh trigal@<ip-de-la-pi>` (sección 6).
+- **Desde cualquier lugar con internet:** entrar a connect.raspberrypi.com con la cuenta del proyecto → `rpi4trigal` → Remote shell.
+- Se sabe que se está dentro de la Pi porque la línea empieza por `trigal@rpi4trigal:~ $`.
+- Para pegar un comando en la terminal: clic derecho, o **Ctrl+Shift+V**. Para detener un comando que no termina: **Ctrl+C**.
+- Si un comando pide contraseña, al escribirla no se ve nada en pantalla. Es normal: escribirla y dar Enter.
+
+**Cuatro reglas antes de cambiar cualquier cosa**
+
+1. Hacer una copia de lo que se va a modificar (sección 12, al inicio).
+2. Cambiar una sola cosa a la vez y comprobar que funciona antes de seguir.
+3. Al terminar, ejecutar `revisar-estacion` (sección 13): debe decir "Todo lo esencial está funcionando".
+4. Anotar el cambio en el registro de cambios (sección 15) y, si cambió una clave, actualizarla en Bitwarden.
+
 ## 2. Cómo funciona: flujos de datos y fotos
 
 La ESP32-S3 mide y envía una línea de texto por USB cada minuto. La Raspberry Pi la guarda, la procesa y la muestra; solo usa internet para publicar el dashboard y subir las fotos. Si se cae el 4G, la estación sigue midiendo y guardando.
 
-&#91;embedded content: Arquitectura de la estación · del sensor al usuario\]
+```
+Sensores ── ESP32-S3 ──USB (trama $EST)── Raspberry Pi 4
+                                            │ trigal-serial → Mosquitto (MQTT) → Node-RED → InfluxDB → Grafana
+                                            │ cámara USB (servicio camara) → fotos → Google Drive
+                                            └ 4G SIM7600 ── túnel Cloudflare ── iot.trigal-digital.com / cam.trigal-digital.com
+```
 
 ### Flujo A — Captura (ESP32-S3)
 
@@ -115,15 +139,15 @@ La estación es un trípode con mástil que lleva los sensores, la cámara y los
 
 | Componente | Mide o hace | Conexión | Dirección o pin |
 | --- | --- | --- | --- |
-| Raspberry Pi 4 (4 GB) | Servidor local: puente, base de datos, dashboard, cámara | Cargador propio | — |
-| ESP32-S3 (placa *ESP32S3 Dev Module*) | Lee sensores y maneja LEDs y ventilador | USB a la Pi (chip CP210x) | Aparece como `/dev/esp32` |
+| Raspberry Pi 4 (4 GB) | Servidor local: puente, base de datos, dashboard, cámara | Fuente oficial de 27 W | — |
+| ESP32-S3 (placa D-ESP32-S3; en Arduino, ESP32S3 Dev Module) | Lee sensores y maneja LEDs y ventilador | USB a la Pi por el conector marcado UART o COM (chip CP210x) | Aparece como `/dev/esp32` |
 | SCD30 | CO₂ (ppm), temperatura (°C) y humedad relativa (%) del aire | I²C a 50 kHz | `0x61`; pin SEL a GND o al aire |
 | TSL2591 | Iluminancia (lux) | I²C | `0x29` |
-| Sensor PAR | PPFD (µmol·m⁻²·s⁻¹) | RS485 Modbus, 4800 baudios | ID 1, registro `0x0000` |
+| Sensor PAR SEN0641 | PPFD (µmol·m⁻²·s⁻¹) | RS485 Modbus, 4800 baudios | ID 1, registro `0x0000` |
 | 3 sondas JXBS-3001 | Humedad, temperatura, CE y pH del sustrato | RS485 Modbus, 4800 baudios | IDs 4, 2 y 3 (sondas 1, 2 y 3) |
-| DHT22 | Temperatura dentro de la caja | Digital | Pin en `PIN_DHT` |
-| Ventilador 12 V | Enfría la caja: prende a 25 °C y apaga a 22 °C | MOSFET | Pin en `PIN_VENT` |
-| 2 LEDs blancos + 1 LED UV | Iluminación para las fotos, en canales separados | MOSFET DFR0457 | Blancos GPIO 6, UV GPIO 10 |
+| DHT22 | Temperatura dentro de la caja | Digital | GPIO 4 (`PIN_DHT`) |
+| Ventilador 12 V | Enfría la caja: prende a 25 °C y apaga a 22 °C | MOSFET | GPIO 5 (`PIN_VENT`) |
+| 2 LEDs blancos + 1 LED UV | Iluminación para las fotos, en canales separados | MOSFET DFR0457, con una resistencia de potencia de 10 W en serie por canal | Blancos GPIO 6 (`PIN_LED_BLANCO`), UV GPIO 10 (`PIN_LED_UV`) |
 | Cámara USB con lente varifocal | Fotos y video, 1280×720 MJPG | USB a la Pi | `/dev/video0` |
 | HAT Waveshare M.2 + SIM7600G-H | Internet 4G con Claro | USB a la Pi (modo RNDIS) | Interfaz `usb0` |
 
@@ -131,16 +155,19 @@ El bus I²C usa SDA en **GPIO 8** y SCL en **GPIO 9**. Los registros de las sond
 
 **Pines según el plano de Proteus:** módulo RS485 con TX en GPIO 17 y RX en GPIO 18 (si un sensor RS485 no responde, probar a intercambiarlos en el código); DHT22 con DATA en GPIO 4. Cables RS485 de las sondas y del PAR: café = 12 V, negro = GND, amarillo = A, azul = B. Si A y B quedan invertidos, el sensor no responde.
 
+**Conexión de la ESP32-S3 a la Pi:** la placa tiene dos conectores USB-C. Se usa el marcado **UART** o **COM** (chip CP210x), que es el que reconoce la regla `99-esp32.rules` (sección 17). El otro conector (USB nativo) no funciona con el puente. No conectar a la Pi otro aparato con chip CP210x al mismo tiempo, porque la regla no podría distinguirlos.
+
 **Registros adicionales del sensor PAR (SEN0641):** `0x0052` corrección frente a un medidor de referencia; `0x07D0` dirección Modbus; `0x07D1` velocidad (0 = 2400, 1 = 4800, 2 = 9600 baudios).
 
 **Caja de control** (numeración de la foto del manual de usuario): resistencias de potencia de 10 W de los LEDs, Raspberry Pi 4 con el módulo 4G, ESP32-S3, conexiones del sensor de luz y del de CO₂, borneras de los MOSFET de potencia (ventiladores, LED UV y LEDs blancos), fuente de 12 V, módulo RS485, multitoma, ventilador de la caja, MOSFET, breaker de protección y bornera aérea.
 
-> **Por confirmar antes de entregar — diferencias entre este manual y el anexo del manual de usuario:**
+> **Confirmado con el firmware cargado (`PAYLOAD.ino` del 21-nov-2026, el mismo del repositorio) y correcciones pendientes en el manual de usuario:**
 >
-> 1. **Direcciones y velocidad del bus RS485.** El anexo indica configurar todos los sensores a 9600 baudios, el PAR con dirección 1 y las sondas con 2, 3 y 4. La última versión del firmware revisada usa `BAUDIOS_485 4800` y sondas con IDs 4, 2 y 3. Los valores del firmware deben coincidir con los configurados en los sensores; revisar los `#define` del `PAYLOAD.ino` cargado y corregir esta sección y la 4.
-> 2. **Función del DHT22.** El manual de usuario lo presenta como sensor de temperatura y humedad del aire. En el firmware de la estación se usa como temperatura de la caja (`temp_caja`) para el ventilador. Aclarar en ambos documentos qué mide y dónde está ubicado.
-> 3. **Tiempo de arranque.** El manual de usuario dice que en unos 2 minutos ya está midiendo. Es correcto para los datos; todos los servicios (túnel, cámara y revisión automática) quedan listos en unos 7 minutos.
-> 4. **Fuente de 12 V a 110 V.** Revisar si la fuente tiene selector de 110/220 V antes de conectarla a una toma de 110 V.
+> 1. **Bus RS485:** el firmware usa 4800 baudios, el PAR con dirección 1 y las sondas con 4, 2 y 3. El anexo del manual de usuario dice 9600 baudios y sondas 2, 3 y 4: hay que corregir el manual de usuario.
+> 2. **DHT22:** mide la temperatura dentro de la caja (`temp_caja`) para controlar el ventilador; no mide el aire del cultivo. Corregir el manual de usuario.
+> 3. **Pines:** LEDs blancos en GPIO 6, LED UV en GPIO 10, ventilador en GPIO 5 (prende a 25 °C y apaga a 22 °C) y DHT22 en GPIO 4. Una versión anterior del código usaba 13 y 14 para los LEDs.
+> 4. **Tiempo de arranque:** el manual de usuario dice que en unos 2 minutos ya está midiendo. Es correcto para los datos; todos los servicios (túnel, cámara y revisión automática) quedan listos en unos 7 minutos.
+> 5. **Fuente de 12 V a 110 V (pendiente):** revisar si la fuente tiene selector de 110/220 V antes de conectarla a una toma de 110 V.
 
 **Energía**
 
@@ -165,6 +192,36 @@ La estación se conecta con un solo cable a 220 V (invernaderos de El Trigal) o 
 - No cubrir el SCD30 ni el sensor PAR. Limpiar el domo del PAR y el lente de la cámara con un paño seco cuando tengan polvo o condensación.
 - Las sondas de suelo van en el sustrato, en la zona de raíces, sin tocar goteros ni paredes de la cama.
 - El SCD30 reportó valores bajos de CO₂ en laboratorio (unos 320 ppm, cuando el aire exterior tiene más de 420 ppm). Antes de usar el CO₂ para decisiones, conviene recalibrarlo al aire libre.
+
+**Lista de materiales** (para construir otra estación; tomada del presupuesto del equipo, noviembre de 2026)
+
+| Componente | Cantidad | Para qué |
+| --- | --- | --- |
+| Raspberry Pi 4 Model B, 4 GB | 1 | Servidor local |
+| Fuente oficial Raspberry Pi de 27 W (USB-C) | 1 | Alimentación de la Pi |
+| MicroSD de 128 GB, clase 10 (SanDisk Extreme PRO o Kingston Canvas) | 1 | Sistema, base de datos y fotos |
+| ESP32-S3 (D-ESP32-S3-1M) | 1 | Lectura de sensores y control de LEDs y ventilador |
+| HAT Waveshare SIM7600G-H M.2 4G (WS-21707) con sus antenas | 1 | Internet 4G |
+| Fuente de 5 V / 3 A con conector USB-C | 1 | Alimentación del HAT 4G |
+| SIM nano de Claro, prepago, sin PIN | 1 | Línea de datos |
+| SCD30 (CO₂, temperatura y humedad) | 1 | Aire |
+| TSL2591 | 1 | Lux |
+| Sensor PAR SEN0641 (RS485) | 1 | PPFD |
+| Sonda de suelo JXBS-3001-TR-RS 4 en 1 (RS485, alimentación de 12 a 24 V) | 3 | Humedad, temperatura, CE y pH del sustrato |
+| Módulo RS485 a TTL | 1 | Comunicación de la ESP32 con el PAR y las sondas |
+| DHT22 | 1 | Temperatura de la caja |
+| Controlador MOSFET DFR0457 | 6 (3 en uso) | LEDs blancos, LED UV y ventilador |
+| LEDs de potencia: 2 blancos y 1 UV | 3 | Luz para las fotos |
+| Resistencias de potencia de 10 W | 1 por canal de LED | Limitar la corriente de los LEDs (el presupuesto lista 6,8 Ω; verificar el valor marcado en la resistencia instalada) |
+| Fuente conmutada Mean Well LRS-35-12 (12 V, 3 A) | 1 | LEDs, ventiladores y sensores RS485 |
+| Ventilador de 12 V, 80 × 80 mm | 1 | Enfriar la caja |
+| Cámara USB con lente varifocal (MJPG, 1280×720) | 1 | Fotos y video |
+| Caja plástica IP65 de 400 × 300 × 148 mm (Kowet K4030-148) | 1 | Proteger la electrónica |
+| Breaker de riel, switch exterior y multitoma | 1 de cada uno | Protección y distribución de la energía |
+| Trípode y mástil | 1 | Estructura (fabricada por Multivallas Medellín) |
+| Cables, borneras DC, amarres, tornillería y piezas impresas en PLA | Varios | Montaje |
+
+La mayoría de los componentes electrónicos se compraron en Didácticas Electrónicas (Medellín). Guarde las fichas técnicas de los sensores junto con el repositorio: ahí están los registros Modbus y los rangos de medida.
 
 ## 4. Firmware de la ESP32-S3
 
@@ -201,7 +258,12 @@ Node-RED agrega `dpv` (kPa), `punto_rocio` (°C) y `margen_rocio` (°C). Un camp
 | `#OK,estacion lista` | La ESP32 arrancó |
 | `Estado: LUZ_APAGADA` / `LUZ_BLANCA` / `LUZ_UV` | Cambio de estado de la MEF de luces |
 | `#OK,luz lista` | La luz pedida ya está estable y se puede tomar la foto |
-| `#OK,...` / `#ERR,...` | Respuesta a una orden, o aviso de error |
+| `#OK,ping` | Respuesta a la orden `ping` |
+| `#ERR,SCD30 sin datos nuevos` / `#ERR,TSL2591 desconectado` | Un sensor I²C dejó de responder: sus campos van como `nan` y se reintenta cada 30 s |
+| `#ERR,luz apagada por tiempo maximo` | Un LED llegó a su tiempo máximo sin recibir la orden de apagar |
+| `#ERR,orden desconocida` | Llegó una orden distinta de `blanco`, `uv`, `apagar` o `ping` |
+| #OK,SCD30 detectado / #OK,TSL2591 detectado | El sensor I²C respondió al arrancar o al reintentar |
+| #ERR,SCD30 no detectado / #ERR,TSL2591 no detectado | El sensor no respondió; la estación sigue con los demás y lo reintenta cada 30 s. Revisar cables I²C (GPIO 8 y 9) y alimentación |
 
 El puente los publica en `trigal/estacion1/esp`, no en `datos`, para no mezclar texto con números.
 
@@ -231,19 +293,38 @@ Todas están como `#define` al inicio de `PAYLOAD.ino`:
 
 | Constante | Valor | Qué controla |
 | --- | --- | --- |
+| `PIN_SDA` / `PIN_SCL` | 8 / 9 | Bus I²C (SCD30 y TSL2591) |
+| `PIN_RX` / `PIN_TX` | 18 / 17 | Módulo RS485 |
+| `PIN_DHT` / `PIN_VENT` | 4 / 5 | DHT22 de la caja y MOSFET del ventilador |
+| `PIN_LED_BLANCO` / `PIN_LED_UV` | 6 / 10 | MOSFET de los LEDs (ver la nota de la sección 3) |
 | `T_LECTURA` | 10000 ms | Lectura de aire, luz y caja, y control del ventilador |
 | `T_ENVIO` | 60000 ms | Envío de la trama a la Pi |
 | `T_SUELO` | 900000 ms (15 min) | Ronda de las sondas de suelo. En suelo de campo se sugiere 300000 (5 min) |
 | `T_PRIMER_ENVIO` | 15000 ms | Primer envío después de encender |
 | `T_ON` / `T_OFF` | 25,0 / 22,0 °C | Temperatura de la caja para prender y apagar el ventilador |
+| `T_ESTABILIZAR` | 500 ms | Espera con la luz encendida antes de avisar `#OK,luz lista` |
 | `T_MAX_LUZ` | 10000 ms | Tiempo máximo de un LED encendido sin orden de apagar |
 | `T_MAX_MANUAL` | 300000 ms | Máximo aceptado en `seg` |
 | `VELOCIDAD_I2C` / `T_ESPERA_I2C` | 50000 Hz / 200 ms | El SCD30 necesita I²C lento y hasta 150 ms de espera |
-| `BAUDIOS_485` | 4800 | Velocidad del bus RS485 |
+| `T_REINTENTO_I2C` | 30000 ms | Cada cuánto se intenta reconectar un sensor I²C caído |
+| `T_SIN_DATOS_SCD30` | 30000 ms | Tiempo sin datos nuevos del SCD30 para darlo por caído (`scd=0`) |
+| `BAUDIOS_485` | 4800 | Velocidad del bus RS485 (igual en todos los sensores) |
+| `BAUDIOS_RASPI` | 115200 | Velocidad del USB hacia la Pi; debe coincidir con `SERIAL_BAUD` de `trigal.env` |
 | `ID_SENSOR_SUELO_1..3`, `ID_SENSOR_PAR_1` | 4, 2, 3 y 1 | Direcciones Modbus |
-| `PIN_LED_BLANCO` / `PIN_LED_UV` | 13 / 14 | Pines de los MOSFET de los LEDs |
+| `REG_PAR` / `PAR_USA_REG_ENTRADA` | `0x0000` / `false` | Registro del PAR y función Modbus que usa (`false` = 0x03, `true` = 0x04) |
+| `INTERVALO_PETICION` | 100 ms | Pausa entre peticiones Modbus seguidas |
 
 ### Cómo cargar o actualizar el firmware
+
+**Preparar el computador (solo la primera vez)**
+
+1. Instalar Arduino IDE 2 desde arduino.cc.
+2. Agregar las placas ESP32: File → Preferences → Additional boards manager URLs → pegar `https://espressif.github.io/arduino-esp32/package_esp32_index.json` → OK. Luego Tools → Board → Boards Manager → buscar `esp32` → instalar **esp32 by Espressif Systems**.
+3. Instalar las librerías: Tools → Manage Libraries → buscar e instalar cada una: **SparkFun SCD30 Arduino Library**, **Adafruit TSL2591 Library**, **Adafruit Unified Sensor**, **modbus-esp8266** (de Alexander Emelianov; trae `ModbusRTU.h`) y **DHT sensor library** (de Adafruit).
+4. Conectar la ESP32 al computador por el conector UART o COM. Si en Windows no aparece ningún puerto COM nuevo, instalar el controlador CP210x de Silicon Labs.
+5. Tools → Board → esp32 → **ESP32S3 Dev Module**, y Tools → Port → el COM que apareció.
+
+**Cargar el código**
 
 1. En la Pi, detener el puente para liberar el puerto: `sudo systemctl stop trigal-serial`.
 2. Desconectar el USB de la ESP32 de la Pi y conectarlo a un computador con Arduino IDE.
@@ -253,7 +334,7 @@ Todas están como `#define` al inicio de `PAYLOAD.ino`:
 6. Conectar otra vez la ESP32 a la Pi y arrancar el puente: `sudo systemctl start trigal-serial`.
 7. Comprobar a los 2 minutos: `journalctl -u trigal-serial --since "-2 min" --no-pager | tail`. No debe aparecer "no manda nada".
 
-Si se cambia `T_ENVIO`, el puente debe esperar al menos el triple antes de reiniciar la ESP32. Ajustar `SIN_DATOS_S` en `/opt/trigal/app/serial_mqtt.py` (hoy 180 s para envíos de 60 s) y reiniciar con `sudo systemctl restart trigal-serial`.
+Si se cambia `T_ENVIO`, el puente debe esperar al menos el triple antes de reiniciar la ESP32. Ajustar `SIN_DATOS_S` en `/opt/trigal/app/serial_mqtt.py` (hoy 180 s para envíos de 60 s; el mismo archivo tiene SIN\_SUELO\_S = 1800, que reinicia la ESP32 si pasan 30 min sin datos de suelo) y reiniciar con `sudo systemctl restart trigal-serial`.
 
 ## 5. Raspberry Pi: carpetas, servicios, contenedores y puertos
 
@@ -680,7 +761,7 @@ GDD = \frac{T_{máx} + T_{mín}}{2} - T_{base}
 
 Tmáx y Tmín salen de los promedios de 5 min, para que un pico suelto no altere el resultado. La T-base por defecto es 5 °C y se define en cada ciclo desde el formulario `/ciclo`. Al cambiarla, todo el histórico del ciclo se recalcula solo.
 
-**DLI** = Σ(PPFD × Δt) / 1 000 000. Entre dos lecturas se cuenta como máximo `DT_MAX` segundos, para no inventar luz en los huecos sin datos. Con envíos cada 60 s, `DT_MAX` debe ser **150** (con el envío anterior de 5 s era 60): revisar que la tarea tenga 150. El campo `horas_datos` dice cuántas horas del día tuvieron PAR; un día con menos de 24 h está incompleto y su DLI sale bajo.
+**DLI** = Σ(PPFD × Δt) / 1 000 000. Entre dos lecturas se cuenta como máximo `DT_MAX` segundos, para no inventar luz en los huecos sin datos. Con envíos cada 60 s, `DT_MAX` debe ser **150** (con el envío anterior de 5 s era 60): revisar que la tarea tenga 150 (la versión de la sección 17 ya lo trae). El campo `horas_datos` dice cuántas horas del día tuvieron PAR; un día con menos de 24 h está incompleto y su DLI sale bajo.
 
 **Fotoperiodo** = hora de fin de luz − hora de inicio de luz. Hay luz efectiva cuando el PPFD es ≥ 2 µmol·m⁻²·s⁻¹ durante un minuto completo (`UMBRAL_LUZ`). Si no hay PAR, se calcula con los lux del TSL2591 y un umbral de 108 lux (`UMBRAL_LUX`; aproximación para luz solar de 1 µmol·m⁻²·s⁻¹ ≈ 54 lux).
 
@@ -764,7 +845,7 @@ La estación mide variables generales del ambiente, así que sirve para cualquie
 | DLI de referencia | 11 mol·m⁻²·d⁻¹ | El DLI de saturación o el recomendado para el cultivo | Panel de DLI → *Thresholds* |
 | Rangos de DPV, humedad y margen al rocío | Ver tabla anterior | Los rangos del cultivo y de su etapa (propagación, vegetativa, floración) | Paneles correspondientes → *Thresholds* |
 | Ronda de las sondas de suelo | 15 min (sustrato) | En suelo de campo, que cambia más rápido, 5 min | `T_SUELO` en el firmware (sección 4) |
-| Altitud del sitio | Rionegro, unos 2100 m | Si la estación se usa a otra altitud, el SCD30 debe compensarla | `setAltitudeCompensation()` del SCD30 en el firmware |
+| Altitud del sitio | Rionegro, unos 2100 m | Si la estación se usa a otra altitud, el SCD30 debe compensarla | `setAltitudeCompensation()` en el programa de calibración del SCD30 (sección 12). El sensor guarda el valor en su memoria y PAYLOAD.ino no lo cambia |
 | Nombre del cultivo | Lote y ubicación en `/ciclo` | El formulario no tiene un campo "cultivo" | Escribir el cultivo en la ubicación del ciclo, o agregar el campo al formulario en la pestaña *Ciclos del cultivo* de Node-RED |
 
 **Paso a paso para cambiar un umbral de color en Grafana:** entrar como `admin_trigal` → en el panel, menú → *Edit* → panel derecho → *Thresholds* → cambiar los números o agregar uno con *+ Add threshold* → *Save dashboard*. Para que el umbral se vea como línea en la gráfica: *Thresholds* → *Show thresholds* → *As lines*.
@@ -1186,7 +1267,7 @@ Es el único sensor que se calibra en campo: al instalar la estación y cada 6 a
 5. Volver a cargar `PAYLOAD.ino`, conectar la ESP32 a la Pi y `sudo systemctl start trigal-serial`.
 6. Anotar la fecha de la calibración.
 
-Si la estación se usa a otra altitud, cambiar `2100` por la altitud del sitio y revisar que el firmware de la estación use el mismo valor.
+Si la estación se usa a otra altitud, cambiar `2100` por la altitud del sitio y volver a correr la calibración. El sensor guarda la altitud en su memoria; el firmware de la estación no la modifica.
 
 ### Configurar la dirección Modbus de un sensor nuevo o de reemplazo
 
@@ -1206,6 +1287,21 @@ revisar-estacion              # revisión completa ahora
 cat ~/ultimo-arranque.txt     # resultado del último arranque
 ```
 
+Si está instalado `prueba-final` (carpeta `raspberry/bin` del repositorio), hace una revisión más profunda: además cuenta, campo por campo, las lecturas que llegaron a InfluxDB en los últimos minutos.
+
+### Diagnóstico en seis preguntas (para quien no conoce el sistema)
+
+Responder en orden. La primera respuesta "no" indica dónde está la falla.
+
+| Pregunta | Cómo saberlo | Si la respuesta es no |
+| --- | --- | --- |
+| 1. ¿Carga `https://iot.trigal-digital.com` desde un celular con datos móviles? | Abrir la página | Error 1033: Pi apagada, sin 4G o sin saldo. Revisar que la estación tenga energía, el saldo en Mi Claro y luego entrar por Pi Connect y ejecutar `revisar-estacion` |
+| 2. ¿El último dato tiene menos de 2 minutos? | Primera fila del dashboard | El puente o la ESP32: `journalctl -u trigal-serial -n 30` y revisar el cable USB de la ESP32 |
+| 3. ¿Todos los paneles muestran datos? | Paneles con "No data", o SCD30 y TSL2591 en "Sin conexión" en la fila Sistema | Revisar los cables del sensor que falta (tabla de fallas, abajo) |
+| 4. ¿Hay fotos de la última hora programada? | Fila Cámara | `systemctl status camara` y `curl -s localhost:3333/foto/estado` (sección 8) |
+| 5. ¿Aparecen los índices de ayer, después de las 00:10? | Fila Índices del ciclo | InfluxDB → Tasks → `indices_diarios` → Runs (sección 9) |
+| 6. ¿Las fotos están llegando a Drive? | Drive del proyecto → EstacionTrigal/fotos | `journalctl -u fotos-nube -n 30` (sección 8) |
+
 ### Revisión rápida desde el celular
 
 1. Abrir `https://iot.trigal-digital.com` con datos móviles.
@@ -1216,7 +1312,7 @@ cat ~/ultimo-arranque.txt     # resultado del último arranque
 
 ### Puesta en marcha en campo
 
-1. Conectar la regleta. Esperar unos 7 minutos sin tocar nada.
+1. Conectar el cable a la toma y subir el switch exterior. Esperar unos 7 minutos sin tocar nada.
 2. Desde un celular con datos móviles, abrir `https://iot.trigal-digital.com` y comprobar que llegan datos.
 3. Si la estación se instaló en un lote distinto, iniciar el ciclo nuevo en `/ciclo` (sección 7).
 4. Enfocar la cámara si hace falta (sección 12, "Cambiar o reemplazar la cámara").
@@ -1277,6 +1373,10 @@ Durante esos 3 minutos: en connect.raspberrypi.com, `rpi4trigal` debe aparecer *
 | MicroSD por encima de 90 % | Fotos o registros acumulados | Revisar `du -sh ~/fotos` y que `fotos-nube` esté moviendo las fotos viejas |
 | El 4G no conecta al encender | El módulo tarda en estar listo | El vigilante reintenta solo; si no, presionar RESET en el HAT |
 | La ESP32 se reinicia sola o envía líneas raras | ModemManager reactivado, que le envía comandos AT | `sudo systemctl disable --now ModemManager` |
+| El puente dice "Sin datos de suelo hace ... reinicio la ESP32" | Las sondas no responden: cable RS485, alimentación de 12 V o direcciones Modbus | Revisar cables y fuente de 12 V. Mientras falle, el puente reinicia la ESP32 cada 30 min (SIN\_SUELO\_S) |
+| Los LEDs no prenden al tomar la foto | Pin distinto en el firmware, MOSFET o resistencia dañados, o fuente de 12 V apagada | Enviar {"cmd":"blanco","seg":20} (sección 4) y mirar el LED; revisar PIN\_LED\_BLANCO, PIN\_LED\_UV y la bornera del MOSFET |
+| El ventilador de la caja no prende | La caja está por debajo de 25 °C (normal), el DHT22 no lee o falla el MOSFET del ventilador | En la fila Sistema, con temp\_caja por encima de 25 °C el campo ventilador debe estar en 1; si no, revisar el DHT22 (GPIO 4) y el MOSFET (GPIO 5) |
+| Arduino IDE no encuentra el puerto de la ESP32 | Conector USB equivocado, cable que solo carga o falta el controlador CP210x | Usar el conector UART o COM y otro cable; instalar el controlador (sección 4) |
 
 Si nada de lo anterior funciona: `sudo reboot`, esperar 7 minutos y revisar `~/ultimo-arranque.txt`.
 
@@ -1306,9 +1406,29 @@ El archivo `configuracion.tgz` contiene claves y tokens: guardarlo solo en lugar
 
 **Restaurar solo los datos de InfluxDB:** copiar la carpeta del respaldo a `/opt/trigal/influxdb/data/` y ejecutar `docker exec influxdb influx restore /var/lib/influxdb2/<carpeta> --full`. Un CSV de `/descarga` sirve para analizar, pero no se vuelve a cargar solo.
 
-### Repositorio sugerido
+### Código fuente: repositorio `estacion-trigal`
 
-Un repositorio privado en GitHub con la cuenta del proyecto, con las carpetas `firmware/` (`PAYLOAD.ino`), `raspberry/` (scripts, servicios y YML), `camara/` (`main.py`), `node-red/` (flujos exportados), `grafana/` (dashboards exportados), `influxdb/` (script de `indices_diarios`) y `docs/` (este manual). Nunca subir `trigal.env`, `influx-sistema.env`, `settings.js`, `passwd`, `rclone.conf` ni tokens.
+Todo el código del proyecto está en el repositorio privado de GitHub **[estacionfloreseltrigal-hub/estacion-trigal](https://github.com/estacionfloreseltrigal-hub/estacion-trigal)**, de la cuenta del proyecto. Este manual es su documentación. Para descargarlo completo: en la página del repositorio, Code → Download ZIP (con una cuenta que tenga acceso), o `git clone https://github.com/estacionfloreseltrigal-hub/estacion-trigal`.
+
+| Carpeta | Qué contiene | Dónde va en la Pi |
+| --- | --- | --- |
+| `firmware/PAYLOAD/` | `PAYLOAD.ino`, firmware de la ESP32-S3 | Se carga con Arduino IDE (sección 4) |
+| `raspberry/app/` | `serial_mqtt.py` y ejemplos de `trigal.env` e `influx-sistema.env` sin claves | `/opt/trigal/app/` |
+| `raspberry/camara/` | `main.py` y `requirements.txt` del servidor de la cámara | `/home/trigal/fastapi-cam/` |
+| `raspberry/bin/` | `revisar-estacion`, `prueba-final`, `esperar-hora`, `lte-watchdog.sh`, `fotos-nube.sh`, `metricas-sistema` | `/usr/local/bin/` |
+| `raspberry/systemd/` | Servicios y temporizadores (sección 17) | `/etc/systemd/system/` |
+| `raspberry/udev/` | `99-esp32.rules` | `/etc/udev/rules.d/` |
+| `raspberry/sistema/` | `50-persistente.conf` (registros persistentes) | `/etc/systemd/journald.conf.d/` |
+| `docker/` | YML de cada contenedor y `mosquitto.conf` | `/opt/trigal/stacks/` y `/opt/trigal/mosquitto/config/` |
+| `node-red/` | Flujos exportados | Se importan desde el editor de Node-RED |
+| `influxdb/` | `indices_diarios.flux` | InfluxDB → Tasks |
+| `grafana/dashboards/` | Dashboards exportados | Grafana → Dashboards → Import |
+
+- **La versión que vale es la de la Pi.** Parte del código se reconstruyó a partir de las conversaciones de trabajo; el archivo `RESCATE.md` del repositorio dice de dónde salió cada archivo y qué tan confiable es.
+- El `PAYLOAD.ino` del repositorio es el mismo que está cargado en la ESP32 (comparados el 22 de noviembre de 2026). Los archivos de la sección 17 son copia de la carpeta `raspberry/` del repositorio.
+- Al entregar faltaban en el repositorio los flujos de ciclos y descargas de Node-RED y los dos dashboards de Grafana. Para completarlo: copiar la carpeta del repositorio a la Pi y ejecutar ahí `bash recolectar-desde-la-pi.sh`, que copia todo y quita las claves. También se pueden exportar a mano: Node-RED → ☰ → Exportar → Todos los flujos; en Grafana, en cada dashboard, Export → Export as JSON.
+- Nunca subir `trigal.env`, `influx-sistema.env`, `passwd`, `rclone.conf`, `flows_cred.json` ni tokens. El `.gitignore` del repositorio ya los bloquea, y el script reemplaza los hashes de `settings.js`.
+- Después de cada cambio en la Pi o en el firmware, subir los archivos nuevos con un mensaje que diga qué cambió y anotarlo en el registro de cambios (sección 15).
 
 ### Reinstalación desde cero (sin imagen)
 
@@ -1333,7 +1453,7 @@ sudo nmcli connection add type ethernet ifname usb0 con-name claro4g ipv4.route-
 sudo nmcli connection modify claro4g connection.autoconnect-retries 0 ipv4.dhcp-timeout infinity
 ```
 
-Instalar `lte-watchdog.sh`, `.service` y `.timer` desde el respaldo y activar: `sudo systemctl enable --now lte-watchdog.timer`.
+Instalar `lte-watchdog.sh`, `.service` y `.timer` (su contenido está en la sección 17) y activar: `sudo systemctl enable --now lte-watchdog.timer`.
 
 **3. Docker y Portainer.** Instalar Docker desde el repositorio oficial (docs.docker.com, Debian). Luego:
 
@@ -1454,6 +1574,8 @@ El token del túnel está en one.dash.cloudflare.com → *Tunnels* → `rpi4trig
 
 **12. Raspberry Pi Connect.** `sudo apt install -y rpi-connect-lite`, `rpi-connect signin` y abrir el enlace con la cuenta del proyecto.
 
+Los servicios, temporizadores, reglas y scripts cortos de los pasos 2, 8, 10 y 11 están completos en la sección 17. Los programas largos (`serial_mqtt.py`, `main.py`, `metricas-sistema`, `revisar-estacion`, flujos y dashboards) están en el repositorio.
+
 **13. Comprobar** con la prueba de arranque en frío y la prueba solo con 4G (sección 13).
 
 ## 15. Entrega a El Trigal, limitaciones y recomendaciones
@@ -1472,6 +1594,7 @@ Todo queda a nombre de El Trigal: el equipo de estudiantes no conserva ninguna c
 - [ ] Iniciar el ciclo del lote donde se instala la estación (sección 7).
 - [ ] Hacer y guardar una imagen de la microSD ya entregada (sección 14).
 - [ ] Guardar una copia de este manual, del firmware `PAYLOAD.ino` y de los dashboards exportados.
+- [ ] Entregar a El Trigal el acceso al repositorio estacionfloreseltrigal-hub/estacion-trigal y completarlo con los flujos de Node-RED y los dashboards de Grafana usando recolectar-desde-la-pi.sh (sección 14).
 
 ### Limitaciones conocidas
 
@@ -1491,3 +1614,405 @@ Todo queda a nombre de El Trigal: el equipo de estudiantes no conserva ninguna c
 - Programar el respaldo de la sección 14 una vez por semana.
 - Recalibrar el SCD30 al aire libre y validar la T-base y los umbrales con el equipo agronómico de El Trigal.
 - Ajustar `T_SUELO` a 5 min si la estación se usa en suelo de campo en lugar de sustrato.
+
+### Registro de cambios
+
+Cada cambio en la estación se anota aquí, una línea por cambio, para que quien venga después sepa qué se tocó y dónde quedó la copia.
+
+| Fecha | Qué se cambió | Quién | Dónde quedó la copia |
+| --- | --- | --- | --- |
+| 2026-11-22 | Entrega a El Trigal: la versión que describe este manual | Equipo del curso | Repositorio `estacion-trigal` e imagen de la microSD |
+|  |  |  |  |
+
+## 16. Glosario
+
+Palabras técnicas que aparecen en el manual, explicadas para quien no trabaja con estos temas.
+
+| Término | Qué es, en esta estación |
+| --- | --- |
+| APN | Nombre que el operador móvil exige para dar internet a una SIM. El de Claro es `internet.comcel.com.co` |
+| Baudios | Velocidad de una comunicación serial. Los dos extremos deben usar la misma |
+| Bitwarden | Gestor de contraseñas donde se guardan todas las claves de la estación |
+| Bucket, medición y campo | Organización de InfluxDB: el bucket `estacion` es la base de datos; las mediciones (`datos`, `diario`, `sistema`…) son como tablas, y cada campo es una variable (`temperatura`, `par`…) |
+| CE | Conductividad eléctrica del sustrato, en µS/cm. Indica cuántas sales y fertilizante hay |
+| Cloudflare y túnel | Servicio que publica el dashboard en `trigal-digital.com`. La Pi abre una conexión de salida (el túnel) y Cloudflare entrega por ella las visitas, sin abrir puertos |
+| Contenedor y Docker | Docker ejecuta programas en contenedores, cajas aisladas que traen todo lo que necesitan. Mosquitto, Node-RED, InfluxDB, Grafana y cloudflared corren así |
+| CSV | Archivo de texto con datos en filas y columnas que abre Excel, R o Python |
+| Dashboard y panel | El dashboard es la página de Grafana con las gráficas; cada gráfica o número es un panel |
+| DLI | Integral de luz diaria: toda la luz fotosintética que recibió el cultivo en un día, en mol·m⁻²·d⁻¹ |
+| DPV | Déficit de presión de vapor, en kPa: qué tan seco está el aire para la planta. Bajo = aire saturado; alto = la planta pierde mucha agua |
+| Firmware | Programa que corre dentro de la ESP32 (`PAYLOAD.ino`) |
+| Flux | Lenguaje de consultas de InfluxDB, usado en la tarea `indices_diarios` y en los paneles |
+| Fotoperiodo | Horas de luz efectiva del día, medidas con el sensor PAR |
+| GDD y T-base | Grados-día: calor acumulado por encima de una temperatura base (T-base) por debajo de la cual el cultivo casi no avanza |
+| GPIO | Pin de la ESP32 que se usa como entrada o salida |
+| I²C | Bus de dos cables (SDA y SCL) por el que la ESP32 habla con el SCD30 y el TSL2591 |
+| InfluxDB | Base de datos donde se guardan todas las lecturas con su fecha y hora |
+| IP | Dirección de un equipo en una red, por ejemplo `10.10.80.48` |
+| Kiosco | Modo de Grafana a pantalla completa, sin menús, para un televisor o una pantalla fija |
+| MEF | Máquina de estados finitos: forma de programar en la que el sistema está en un estado (por ejemplo luz apagada, blanca o UV) y pasa a otro cuando se cumple una condición |
+| Modbus y dirección | Idioma con el que la ESP32 pregunta a los sensores RS485. Cada sensor tiene una dirección (ID) distinta |
+| MOSFET | Interruptor electrónico con el que la ESP32 prende los LEDs y el ventilador de 12 V |
+| MQTT, broker y tópico | Sistema de mensajes entre programas. El broker (Mosquitto) recibe y reparte los mensajes; cada mensaje va a un tópico, como `trigal/estacion1/datos` |
+| Node-RED y flujo | Programa visual que recibe los datos por MQTT, calcula índices, los guarda en InfluxDB y sirve las páginas `/ciclo` y `/descarga`. Cada pestaña de nodos conectados es un flujo |
+| PAR y PPFD | PAR es la luz que usan las plantas (400 a 700 nm). PPFD es su intensidad en un instante, en µmol·m⁻²·s⁻¹ |
+| Portainer | Página para administrar los contenedores de Docker sin usar la terminal |
+| Punto y margen de rocío | Temperatura a la que el agua del aire se condensa. El margen es cuántos grados falta para llegar a ella |
+| rclone | Programa que copia las fotos a Google Drive |
+| RNDIS | Modo en que el módulo 4G se presenta a la Pi como una tarjeta de red (`usb0`) |
+| RS485 | Bus de dos cables (A y B) para sensores a varios metros de distancia: el PAR y las sondas de suelo |
+| Servicio y temporizador (systemd) | Un servicio es un programa que la Pi arranca sola; un temporizador lo ejecuta cada cierto tiempo. Se manejan con `systemctl` |
+| SSH y terminal | La terminal es la ventana donde se escriben órdenes; SSH permite abrir la terminal de la Pi desde otro computador |
+| `sudo` | Antepuesto a un comando, lo ejecuta con permisos de administrador. Pide la clave del usuario `trigal` |
+| Token | Clave larga que un programa usa para entrar a InfluxDB sin usuario ni contraseña |
+| Trama `$EST` | Línea de texto con todas las lecturas que la ESP32 envía cada minuto |
+| udev | Parte de Linux que reconoce los aparatos USB; con una regla le da a la ESP32 el nombre fijo `/dev/esp32` |
+
+## 17. Anexo: archivos de configuración de la Pi
+
+Estos son los archivos cortos que hacen que todo arranque solo. Con ellos y el repositorio se puede reconstruir la Pi sin la imagen de la microSD. Ninguno tiene claves. Son copia exacta de la carpeta raspberry/ del repositorio (sección 14).
+
+**Cómo crear o reemplazar uno de estos archivos en la Pi**
+
+1. `sudo nano <ruta del archivo>` (la ruta está en el título de cada archivo).
+2. Borrar lo que tenga, pegar el contenido y guardar: **Ctrl+O**, **Enter**, **Ctrl+X**.
+3. Si es un script de `/usr/local/bin/`, darle permiso de ejecución: `sudo chmod +x <ruta>`.
+4. Si es un `.service`, `.timer` o `.conf` de systemd: `sudo systemctl daemon-reload` y luego `sudo systemctl enable --now <nombre>` (para los que tienen temporizador, el `.timer`).
+5. Si es la regla udev: `sudo udevadm control --reload-rules && sudo udevadm trigger`, y desconectar y conectar la ESP32.
+
+Cuando un bloque trae dos archivos (por ejemplo un `.service` y su `.timer`), cada uno empieza con un comentario con su nombre: se crean por separado, cada uno con su parte.
+
+### Puente ESP32 → MQTT
+
+`/etc/udev/rules.d/99-esp32.rules` (le da a la ESP32 el nombre fijo `/dev/esp32` y le dice a ModemManager que no la toque):
+
+```
+SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", SYMLINK+="esp32", GROUP="dialout", MODE="0660", ENV{ID_MM_DEVICE_IGNORE}="1"
+```
+
+`/etc/systemd/system/trigal-serial.service`:
+
+```ini
+[Unit]
+Description=Estacion Trigal - puente serial ESP32 -> MQTT
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+User=trigal
+Group=dialout
+Environment=TRIGAL_ENV=/opt/trigal/app/trigal.env
+ExecStart=/usr/bin/python3 /opt/trigal/app/serial_mqtt.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+`/etc/systemd/system/trigal-serial.service.d/esperar-hora.conf` (hace que el puente espere la hora antes de arrancar; este archivo se reconstruyó, así que conviene compararlo con `systemctl cat trigal-serial` en la Pi):
+
+```ini
+[Service]
+ExecStartPre=/usr/local/bin/esperar-hora
+TimeoutStartSec=infinity
+```
+
+`/usr/local/bin/esperar-hora`:
+
+```bash
+#!/bin/bash
+# Espera a que la Raspberry tenga la hora sincronizada por internet (4G) antes de
+# arrancar el puente serial. La Pi no tiene reloj propio: al prender sin red arranca
+# con la hora del último apagado y las lecturas quedarían con fechas equivocadas.
+minutos=0
+until [ "$(timedatectl show -p NTPSynchronized --value)" = "yes" ]; do
+    if [ $((minutos % 5)) -eq 0 ]; then
+        echo "Esperando hora por internet ($minutos min). Hora actual de la Pi: $(date '+%F %T')"
+    fi
+    sleep 60
+    minutos=$((minutos + 1))
+done
+echo "Hora sincronizada: $(date '+%F %T')"
+```
+
+### Cámara y fotos
+
+`/etc/systemd/system/camara.service`:
+
+```ini
+[Unit]
+Description=Estacion Trigal - camara (video, fotos con LEDs)
+After=network-online.target docker.service trigal-serial.service
+Wants=network-online.target
+
+[Service]
+User=trigal
+WorkingDirectory=/home/trigal/fastapi-cam
+Environment=TRIGAL_ENV=/opt/trigal/app/trigal.env
+ExecStart=/home/trigal/fastapi-cam/.venv/bin/uvicorn main:app --host 0.0.0.0 --port 3333
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+`/etc/systemd/system/fotos-nube.service` y `fotos-nube.timer` (el script `fotos-nube.sh` está en la sección 8):
+
+```ini
+# fotos-nube.service
+[Unit]
+Description=Estacion Trigal - subir fotos a Google Drive
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=trigal
+ExecStart=/usr/local/bin/fotos-nube.sh
+
+# fotos-nube.timer
+[Unit]
+Description=Estacion Trigal - subir fotos cada hora
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=1h
+
+[Install]
+WantedBy=timers.target
+```
+
+### Métricas, revisión automática y registros
+
+`/etc/systemd/system/metricas-sistema.service` y `metricas-sistema.timer` (el script está en el repositorio):
+
+```ini
+# metricas-sistema.service
+[Unit]
+Description=Estacion Trigal - metricas del sistema (4G, disco, temperatura) a InfluxDB
+After=docker.service vnstat.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/metricas-sistema
+
+# metricas-sistema.timer
+[Unit]
+Description=Ejecuta las metricas del sistema cada 5 minutos
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+
+[Install]
+WantedBy=timers.target
+```
+
+`/etc/systemd/system/revisar-estacion.service` y `revisar-estacion.timer` (el script está en el repositorio):
+
+```ini
+# revisar-estacion.service
+[Unit]
+Description=Estacion Trigal - revision automatica despues de arrancar
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+User=trigal
+ExecStart=/usr/local/bin/revisar-estacion
+StandardOutput=truncate:/home/trigal/ultimo-arranque.txt
+StandardError=inherit
+SuccessExitStatus=0-255
+
+# revisar-estacion.timer
+[Unit]
+Description=Estacion Trigal - revisar 6 minutos despues de encender
+
+[Timer]
+OnBootSec=6min
+Unit=revisar-estacion.service
+
+[Install]
+WantedBy=timers.target
+```
+
+`/etc/systemd/journald.conf.d/50-persistente.conf` (conserva los registros entre reinicios; después de crearlo, `sudo systemctl restart systemd-journald`):
+
+```ini
+[Journal]
+Storage=persistent
+SystemMaxUse=200M
+```
+
+### Vigilante del 4G
+
+`/usr/local/bin/lte-watchdog.sh` (versión 2, 11-nov-2026):
+
+```bash
+#!/bin/bash
+# Vigilante 4G v2: revisa internet por IPv4 e IPv6 y solo actúa tras 3 revisiones seguidas sin red.
+IF=usb0
+STATE=/run/lte-watchdog.fails
+PORT=/dev/serial/by-id/usb-SimTech__Incorporated_SimTech__Incorporated_0123456789ABCDEF-if04-port0
+
+hay_red() {
+  ping -I "$IF" -c 2 -W 5 1.1.1.1 >/dev/null 2>&1 && return 0
+  ping -6 -I "$IF" -c 2 -W 5 2606:4700:4700::1111 >/dev/null 2>&1 && return 0
+  curl --interface "$IF" -s -o /dev/null -m 10 http://connectivitycheck.gstatic.com/generate_204 && return 0
+  curl --interface "$IF" -s -o /dev/null -m 10 https://www.cloudflare.com/cdn-cgi/trace && return 0
+  return 1
+}
+
+if hay_red; then
+  rm -f "$STATE"
+  exit 0
+fi
+
+FAILS=$(( $(cat "$STATE" 2>/dev/null || echo 0) + 1 ))
+echo "$FAILS" > "$STATE"
+logger -t lte-watchdog "Sin internet por $IF (fallo $FAILS de 3)"
+
+if [ "$FAILS" -lt 3 ]; then
+  nmcli connection up claro4g >/dev/null 2>&1
+  exit 0
+fi
+
+if [ -e "$PORT" ]; then
+  logger -t lte-watchdog "3 revisiones seguidas sin red, reiniciando modulo"
+  stty -F "$PORT" 115200 raw -echo 2>/dev/null
+  printf 'AT+CRESET\r' > "$PORT"
+else
+  logger -t lte-watchdog "No se encontro el puerto AT del modulo"
+fi
+rm -f "$STATE"
+```
+
+`/etc/systemd/system/lte-watchdog.service` y `lte-watchdog.timer`:
+
+```ini
+# lte-watchdog.service
+[Unit]
+Description=Vigilante conexion 4G Claro
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/lte-watchdog.sh
+
+# lte-watchdog.timer
+[Unit]
+Description=Ejecuta el vigilante 4G cada 5 minutos
+
+[Timer]
+OnBootSec=90s
+OnUnitActiveSec=5min
+
+[Install]
+WantedBy=timers.target
+```
+
+Antes de activarlo, comprobar con `ls -l /dev/serial/by-id/` que existe la ruta terminada en `-if04-port0`. Si se cambia el módulo 4G por otro, esa ruta cambia y hay que corregir `PORT=`.
+
+### Tarea `indices_diarios` de InfluxDB
+
+Se crea en InfluxDB → Tasks → + Create Task → **New Task** (no Import Task): nombre `indices_diarios`, Schedule **CRON** `10 5 * * *`, Offset `0m`, y se pega este script completo. Esta versión ya trae `DT_MAX = 150.0`, el valor correcto con envíos cada 60 s.
+
+```
+// Tarea de InfluxDB: índices diarios de la estación Trigal
+// Corre a las 00:10 de Colombia y guarda el resumen de los últimos 3 días en la medición "diario".
+// Para llenar días anteriores: pegar en Data Explorer (Script Editor), borrar la línea "option task",
+// cambiar "inicio" y "fin" por fechas fijas y ejecutar una vez.
+
+import "date"
+import "timezone"
+
+option location = timezone.location(name: "America/Bogota")
+option task = {name: "indices_diarios", cron: "10 5 * * *"}   // 05:10 UTC = 00:10 en Colombia
+
+// Parámetros
+UMBRAL_LUZ = 2.0      // PPFD (µmol/m²/s) a partir del cual hay "luz efectiva"
+UMBRAL_LUX = 108.0    // el mismo umbral en lux (luz solar: 1 µmol/m²/s ≈ 54 lux)
+DT_MAX = 150.0        // segundos máximos entre dos lecturas (2,5 veces el envío de 60 s); en un hueco no se inventa luz
+
+fin = date.truncate(t: now(), unit: 1d)
+inicio = date.sub(d: 3d, from: fin)
+
+campo = (f) => from(bucket: "estacion")
+    |> range(start: inicio, stop: fin)
+    |> filter(fn: (r) => r._measurement == "datos" and r._field == f)
+    |> keep(columns: ["_time", "_value", "_field", "_measurement"])
+
+guardar = (tables=<-, nombre) => tables
+    |> map(fn: (r) => ({_time: r._time, _measurement: "diario", _field: nombre, _value: float(v: r._value)}))
+    |> to(bucket: "estacion")
+
+// 1. Temperatura: máxima y mínima de los promedios de 5 min
+temp5 = campo(f: "temperatura")
+    |> aggregateWindow(every: 5m, fn: mean, createEmpty: false, timeSrc: "_start")
+
+tmax = temp5 |> aggregateWindow(every: 1d, fn: max, createEmpty: false, timeSrc: "_start")
+tmin = temp5 |> aggregateWindow(every: 1d, fn: min, createEmpty: false, timeSrc: "_start")
+tmax |> guardar(nombre: "tmax")
+tmin |> guardar(nombre: "tmin")
+join(tables: {a: tmax, b: tmin}, on: ["_time"])
+    |> map(fn: (r) => ({_time: r._time, _value: (r._value_a + r._value_b) / 2.0}))
+    |> guardar(nombre: "tmedia")
+
+// 2. DLI = Σ (PPFD × Δt) / 1 000 000
+par = campo(f: "par")
+    |> elapsed(unit: 1s)
+    |> map(fn: (r) => ({r with
+        dt: if float(v: r.elapsed) > DT_MAX then DT_MAX else float(v: r.elapsed),
+        ppfd: if r._value > 0.0 then r._value else 0.0}))
+
+par
+    |> map(fn: (r) => ({r with _value: r.ppfd * r.dt / 1000000.0}))
+    |> aggregateWindow(every: 1d, fn: sum, createEmpty: false, timeSrc: "_start")
+    |> guardar(nombre: "dli")
+
+par
+    |> map(fn: (r) => ({r with _value: r.dt / 3600.0}))
+    |> aggregateWindow(every: 1d, fn: sum, createEmpty: false, timeSrc: "_start")
+    |> guardar(nombre: "horas_datos")
+
+// 3. Fotoperiodo = hora fin de luz − hora inicio de luz (solo cuenta un minuto completo sobre el umbral)
+minutos_luz = campo(f: "par")
+    |> aggregateWindow(every: 1m, fn: min, createEmpty: false, timeSrc: "_start")
+    |> filter(fn: (r) => r._value >= UMBRAL_LUZ)
+    |> map(fn: (r) => ({r with _value: float(v: uint(v: r._time)) / 1000000000.0}))
+
+ini = minutos_luz |> aggregateWindow(every: 1d, fn: min, createEmpty: false, timeSrc: "_start")
+fil = minutos_luz |> aggregateWindow(every: 1d, fn: max, createEmpty: false, timeSrc: "_start")
+
+ini
+    |> map(fn: (r) => ({r with _value: r._value - float(v: uint(v: r._time)) / 1000000000.0}))
+    |> guardar(nombre: "inicio_luz")
+fil
+    |> map(fn: (r) => ({r with _value: r._value + 60.0 - float(v: uint(v: r._time)) / 1000000000.0}))
+    |> guardar(nombre: "fin_luz")
+join(tables: {a: ini, b: fil}, on: ["_time"])
+    |> map(fn: (r) => ({_time: r._time, _value: r._value_b + 60.0 - r._value_a}))
+    |> guardar(nombre: "fotoperiodo")
+
+// 4. Fotoperiodo con los lux (mismo método), para los días sin PAR
+minutos_lux = campo(f: "lux")
+    |> aggregateWindow(every: 1m, fn: min, createEmpty: false, timeSrc: "_start")
+    |> filter(fn: (r) => r._value >= UMBRAL_LUX)
+    |> map(fn: (r) => ({r with _value: float(v: uint(v: r._time)) / 1000000000.0}))
+
+ini_lux = minutos_lux |> aggregateWindow(every: 1d, fn: min, createEmpty: false, timeSrc: "_start")
+fin_lux = minutos_lux |> aggregateWindow(every: 1d, fn: max, createEmpty: false, timeSrc: "_start")
+
+ini_lux
+    |> map(fn: (r) => ({r with _value: r._value - float(v: uint(v: r._time)) / 1000000000.0}))
+    |> guardar(nombre: "inicio_luz_lux")
+fin_lux
+    |> map(fn: (r) => ({r with _value: r._value + 60.0 - float(v: uint(v: r._time)) / 1000000000.0}))
+    |> guardar(nombre: "fin_luz_lux")
+join(tables: {a: ini_lux, b: fin_lux}, on: ["_time"])
+    |> map(fn: (r) => ({_time: r._time, _value: r._value_b + 60.0 - r._value_a}))
+    |> guardar(nombre: "fotoperiodo_lux")
+```
+
+Después de guardarla: clic en la tarea → Run Task → en Runs debe salir `success`.
