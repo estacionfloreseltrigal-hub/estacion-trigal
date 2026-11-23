@@ -73,19 +73,6 @@ Claves, tokens y hashes nunca se suben. En los archivos aparecen como marcadores
 
 Las claves de El Trigal se guardan en su gestor de contraseñas, no aquí.
 
-## Actualizar el repositorio con lo que tiene la Pi
-
-Después de cambiar algo en la Pi (flujos, tableros, scripts), `recolectar-desde-la-pi.sh` copia las versiones
-actuales a `~/estacion-trigal/`, quita las claves y deja `~/estacion-trigal.tar.gz`:
-
-```bash
-bash ~/estacion-trigal/recolectar-desde-la-pi.sh
-rclone copy ~/estacion-trigal.tar.gz drive:EstacionTrigal/repositorio    # por 4G / Pi Connect
-```
-
-Con SSH en la misma red también sirve `scp trigal@10.10.80.48:~/estacion-trigal.tar.gz .`. Luego se descomprime
-encima de este repositorio, se revisa con `git diff` y se sube.
-
 ## Equipo
 
 Proyecto del curso Plataformas de Agricultura Inteligente (2026-2), entregado a Flores El Trigal en noviembre de 2026.
