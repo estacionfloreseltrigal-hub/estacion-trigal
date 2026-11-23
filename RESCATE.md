@@ -47,8 +47,8 @@ comentarios; la lógica es la misma, se comprobó quitando comentarios y espacio
 los stacks viven dentro de Portainer, así que quedan los del manual), copias de respaldo
 (`*.antes-parche`, `*.antes-clave`, `lte-watchdog.sh.v1`) y duplicados viejos en `/opt/trigal/app`.
 
-`revisar-estacion` (+ `.service`/`.timer`) no apareció en `/usr/local/bin` ni en `/etc/systemd/system`:
-puede que nunca se haya instalado. Revisar con `systemctl list-timers | grep revisar`.
+`revisar-estacion` (+ `.service`/`.timer`) no estaba instalado en la Pi: se instaló el 23-nov-2026 desde este
+repositorio (con la espera de la trama subida a 75 s) y la revisión completa dio todo en verde.
 
 ## Lo que no va al repositorio
 
