@@ -1,6 +1,6 @@
 # Manual técnico – Estación portátil de monitoreo Flores El Trigal
 
-Nov 22, 2026 · @Jayder Andres Juagibioy
+Nov 22, 2026 ·  Jayder Juagibioy, Sara Gallego, Sofia Vásquez, Paola Restrepo, Mariana Cardona, Juan Van De Venter
 
 ## 1. Cómo usar este manual y datos clave
 
@@ -385,7 +385,7 @@ MQTT_PASS=<clave del usuario estacion>
 ESTACION=estacion1
 SERIAL_PORT=            # vacío = usar /dev/esp32
 SERIAL_BAUD=115200
-HORAS_FOTO=...          # horas de las fotos automáticas (4, 12 y 20)
+HORAS_FOTO=04:00,12:00,20:00   # horas de las fotos automáticas (HH:MM, separadas por comas)
 CAM_CLAVE=<clave de la cámara remota>
 ```
 
@@ -434,7 +434,7 @@ Hay dos tipos de acceso: los que funcionan desde cualquier lugar con internet (d
 | Dashboard (consulta) | `https://iot.trigal-digital.com` | `trigal_visor` (solo lectura) | Internet |
 | Dashboard en kiosco | `https://iot.trigal-digital.com/d/trigal-estacion?orgId=1&kiosk` | `trigal_visor` | Internet |
 | Dashboard (administración y edición) | `https://iot.trigal-digital.com` y `/d/trigal-administracion` | `admin_trigal` | Internet |
-| Formulario de ciclos | `https://iot.trigal-digital.com/ciclo` | Usuario de `httpNodeAuth` de Node-RED | Internet |
+| Formulario de ciclos | `https://iot.trigal-digital.com/ciclo` | Usuario de `httpNodeAuth` de Node-RED: admin\_trigal, con una clave propia de las páginas | Internet |
 | Consulta y descarga | `https://iot.trigal-digital.com/descarga` | El mismo de `/ciclo` | Internet |
 | Cámara remota | `https://cam.trigal-digital.com/<CAM_CLAVE>/video_lite` | La clave va en la dirección | Internet |
 | Terminal de la Pi (remota) | [connect.raspberrypi.com](https://connect.raspberrypi.com) → `rpi4trigal` → *Remote shell* | Cuenta Raspberry Pi ID del proyecto | Internet (sale por el 4G) |
@@ -534,7 +534,7 @@ Significa que la estación estuvo más de 6 horas sin datos. Avisar a la persona
 | Estado de la estación y ciclo | Último dato recibido, ciclo y lote actuales, aviso de "¿sigue en el mismo lote?" |
 | Cámara | Botones *Tomar foto ahora*, *Calibrar*, *Ver en tiempo real* y *Apagar*; última foto blanca y última UV |
 | Ambiente | Temperatura, humedad, CO₂, lux, PAR y margen al rocío: valor actual y gráfica |
-| Índices del ciclo | GDD diario y acumulado, DLI, fotoperiodo, Tmáx y Tmín |
+| Índices del ciclo | GDD acumulado, DLI promedio del ciclo, DLI de hoy (hasta ahora), fotoperiodo del último día y su cambio en minutos, margen mínimo al rocío de 24 h, barras diarias de GDD, DLI y fotoperiodo, y la tabla de resumen diario (Tmáx, Tmín, horas con datos) |
 | DPV | DPV promediado cada 15 min |
 | Suelo | Humedad, temperatura, CE y pH de las 3 sondas |
 | Sistema (plegada) | Temperatura de la caja, ventilador, estado del SCD30 y del TSL2591, datos 4G de hoy y del mes, microSD usada y libre, temperatura de la CPU, alimentación de la Pi, consumo 4G por día |
@@ -546,12 +546,22 @@ Significa que la estación estuvo más de 6 horas sin datos. Avisar a la persona
 - **Refresco automático:** por defecto cada 1 min. Para gastar menos datos del 4G se recomienda 5 min.
 - **Enlace "Administración":** solo lo ve `admin_trigal`.
 
-**Colores de referencia** (valores iniciales, ajustables con el criterio agronómico de El Trigal):
+**Colores de referencia** (valores que tienen los paneles el 23-nov-2026, ajustables con el criterio agronómico de El Trigal en Edit → Thresholds):
 
-| Variable | Azul | Verde | Naranja | Rojo |
-| --- | --- | --- | --- | --- |
-| DPV (kPa) | < 0,4 (aire muy húmedo) | 0,4 – 1,2 | > 1,2 (aire seco) | — |
-| Margen al rocío (°C) | — | > 3 | 1 – 3 | < 1 (riesgo de hoja mojada y botrytis) |
+| Panel | Colores |
+| --- | --- |
+| DPV (kPa) | Azul < 0,4 (aire muy húmedo) · amarillo 0,4–0,8 · verde 0,8–1,2 · naranja 1,2–1,5 · rojo > 1,5 (aire muy seco) |
+| Margen al rocío (°C) | Rojo < 1 (riesgo de hoja mojada y botrytis) · naranja 1–3 · verde > 3 |
+| Humedad relativa | Naranja desde 90 % |
+| DLI promedio del ciclo (mol·m⁻²·d⁻¹) | Rojo < 10 · naranja 10–12 · verde ≥ 12 (las barras diarias usan los mismos cortes) |
+| Fotoperiodo diario | Línea de referencia en 12 h |
+| Última lectura | Rojo si pasan más de 10 min sin datos |
+| Temperatura de la caja | Naranja desde 35 °C · rojo desde 40 °C |
+| Temperatura de la CPU | Naranja desde 70 °C · rojo desde 80 °C |
+| Datos 4G hoy | Naranja desde 150 MB · rojo desde 300 MB |
+| Datos 4G este mes | Naranja al 80 % y rojo al 95 % del máximo, que hoy es 5000 MB: cambiarlo al tamaño real del paquete (sección 12) |
+| MicroSD usada | Naranja desde 80 % · rojo desde 90 % |
+| Libre en la microSD | Naranja por debajo de 10 GB · rojo por debajo de 5 GB |
 
 ### Acceso de visitantes y modo kiosco
 
@@ -715,7 +725,7 @@ grep '^CAM_CLAVE=' /opt/trigal/app/trigal.env
 ### Cambiar el horario o la frecuencia de las fotos
 
 1. En la Pi: `sudo nano /opt/trigal/app/trigal.env`.
-2. Buscar la línea `HORAS_FOTO=` y escribir las horas nuevas **en el mismo formato que ya tiene** (horas de 0 a 23). Por ejemplo, para fotos cada 6 horas en lugar de cada 8: 0, 6, 12 y 18.
+2. Buscar la línea `HORAS_FOTO=04:00,12:00,20:00` y escribir las horas nuevas con el mismo formato: hora y minutos (**HH:MM**), separadas por comas y sin espacios. Por ejemplo, para fotos cada 6 horas: `HORAS_FOTO=00:00,06:00,12:00,18:00`.
 3. Guardar y reiniciar: `sudo systemctl restart camara`.
 4. Comprobar: `journalctl -u camara -n 20 --no-pager` no debe mostrar errores, y a la hora siguiente programada debe aparecer la foto con `ls ~/fotos/automaticas/*/ | tail`.
 
@@ -808,8 +818,8 @@ Cada umbral es una decisión que se puede cambiar. Algunos vienen de la literatu
 | T-base del GDD | 5 °C por defecto | Elegida por el equipo, editable por ciclo. Referencia: MSU estimó 36 °F (≈ 2 °C) para snapdragon 'Montego' de maceta; los cultivares de flor de corte pueden ser distintos | Formulario `/ciclo`, en cada ciclo |
 | Método del GDD | (Tmáx + Tmín)/2 − T-base, mínimo 0 | Método clásico del promedio. Usar promedios de 5 min para Tmáx y Tmín es diseño: evita que un pico suelto altere el día | Tarea `indices_diarios` y paneles de GDD |
 | Presión de saturación del DPV | 0,6108·e^(17,27·T/(T+237,3)) | Ecuación de la FAO-56 | Función *Índices instantáneos* de Node-RED |
-| DLI de referencia | 11 mol·m⁻²·d⁻¹ | MSU clasifica el snapdragon como cultivo sensible al DLI: su floración se satura a 11 mol·m⁻²·d⁻¹ o más. Es el mínimo para florecer rápido, no un valor ideal | Umbrales (*Thresholds*) del panel de DLI en Grafana |
-| Colores del DPV | Azul < 0,4 kPa; verde en el rango intermedio; naranja por encima de 1,2 a 1,5 kPa | MSU recomienda mantener el DPV por encima de 0,5 kPa en la etapa final, para que la planta transpire y se eviten enfermedades foliares. Por encima de 1,5 kPa la pérdida de agua es alta y la fotosíntesis puede bajar. El rango verde exacto es referencia | Umbrales del panel de DPV |
+| DLI de referencia | 11 mol·m⁻²·d⁻¹ (en el panel: rojo < 10, naranja 10–12, verde ≥ 12) | MSU clasifica el snapdragon como cultivo sensible al DLI: su floración se satura a 11 mol·m⁻²·d⁻¹ o más. Es el mínimo para florecer rápido, no un valor ideal | Umbrales (*Thresholds*) del panel de DLI en Grafana |
+| Colores del DPV | Azul < 0,4; amarillo 0,4–0,8; verde 0,8–1,2; naranja 1,2–1,5; rojo > 1,5 kPa | MSU recomienda mantener el DPV por encima de 0,5 kPa en la etapa final, para que la planta transpire y se eviten enfermedades foliares. Por encima de 1,5 kPa la pérdida de agua es alta y la fotosíntesis puede bajar. El rango verde exacto es referencia | Umbrales del panel de DPV |
 | Margen al rocío | Rojo < 1 °C; naranja 1 a 3 °C; verde > 3 °C | Diseño: cuando la temperatura del aire se acerca al punto de rocío, el agua se condensa en las hojas (hoja mojada, riesgo de botrytis). Referencia | Umbrales del panel de margen al rocío |
 | Humedad relativa alta | 90 % | Referencia de partida para riesgo de hongos | Umbrales del panel de humedad |
 | Día incompleto | Menos de 23 h con datos de PAR | Diseño: con huecos, el DLI sale más bajo de lo real | Tabla de resumen diario en Grafana |
@@ -830,7 +840,7 @@ Como el día natural casi no cambia en el año, la luz que recibe el cultivo var
 
 En crisantemo, que es de día corto, un día natural de unas 12 h ya favorece la floración. Si el cultivo usa iluminación nocturna en la etapa vegetativa y esa luz supera el umbral en el sensor, aparecerá como PAR de noche o como un fotoperiodo más largo.
 
-Antes de usar los colores de los paneles para decisiones, revisar en cada panel (*Edit* → *Thresholds*) qué valores tiene hoy, porque se ajustaron durante las pruebas.
+Los valores de color de esta tabla y de la sección 7 son los que tienen los paneles el 23 de noviembre de 2026, tomados de los dashboards exportados al repositorio (`grafana/dashboards/`). Antes de usarlos para decisiones, validarlos con el equipo agronómico de El Trigal.
 
 ### Adaptar la estación a otro cultivo
 
@@ -1156,7 +1166,7 @@ En los paneles de suelo, *Connect null values* debe estar en **Always**, porque 
 
 ### Cambiar el máximo del panel "Datos 4G este mes"
 
-*Edit* en el panel → *Standard options* → *Max* = tamaño del paquete en MB (por ejemplo 10000 para 10 GB) → *Save dashboard*. Los colores cambian solos al 80 % y al 95 %.
+*Edit* en el panel → *Standard options* → *Max* = tamaño del paquete en MB (por ejemplo 10000 para un paquete de 10 GB; hoy está en 5000) → *Save dashboard*. Los colores cambian solos al 80 % y al 95 %.
 
 ### Cambiar la actualización automática
 
@@ -1595,7 +1605,7 @@ Todo queda a nombre de El Trigal: el equipo de estudiantes no conserva ninguna c
 - [ ] Iniciar el ciclo del lote donde se instala la estación (sección 7).
 - [ ] Hacer y guardar una imagen de la microSD ya entregada (sección 14).
 - [ ] Guardar una copia de este manual, del firmware `PAYLOAD.ino` y de los dashboards exportados.
-- [ ] Entregar a El Trigal el acceso al repositorio estacionfloreseltrigal-hub/estacion-trigal y completarlo con los flujos de Node-RED y los dashboards de Grafana usando recolectar-desde-la-pi.sh (sección 14).
+- [ ] Entregar a El Trigal el acceso al repositorio estacionfloreseltrigal-hub/estacion-trigal, ya completo y comparado con la Pi el 23-nov-2026 (sección 14).
 
 ### Limitaciones conocidas
 
@@ -1623,6 +1633,7 @@ Cada cambio en la estación se anota aquí, una línea por cambio, para que quie
 | Fecha | Qué se cambió | Quién | Dónde quedó la copia |
 | --- | --- | --- | --- |
 | 2026-11-22 | Entrega a El Trigal: la versión que describe este manual | Equipo del curso | Repositorio `estacion-trigal` e imagen de la microSD |
+| 2026-11-23 | Repositorio completado con los flujos de Node-RED, los dashboards y los archivos de la Pi; revisar-estacion espera 75 s la trama; manual ajustado con los colores reales de los paneles y el formato de HORAS\_FOTO | Equipo del curso | Repositorio (rama main) y este manual |
 |  |  |  |  |
 
 ## 16. Glosario
