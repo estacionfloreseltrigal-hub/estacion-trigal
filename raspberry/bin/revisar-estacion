@@ -78,7 +78,7 @@ else
 fi
 
 echo
-echo "5. Cadena de datos ESP32 → MQTT → Node-RED → InfluxDB → Grafana"
+echo "5. Cadena de datos ESP32 → MQTT → Node-RED → InfluxDB → Grafana   (espera hasta 75 s una trama)"
 [ -e /dev/esp32 ] && ok "ESP32 conectada (/dev/esp32)" || mal "No aparece /dev/esp32" "Revisar cable USB de la ESP32"
 ss -ltn 2>/dev/null | grep -q ':1883 ' && ok "Mosquitto escuchando (1883)" || mal "Mosquitto no escucha en 1883"
 if [ -r "$ENV" ]; then
@@ -105,7 +105,7 @@ except Exception as e:
 c.subscribe("trigal/" + conf.get("ESTACION", "estacion1") + "/datos", 0)
 c.loop_start()
 t = time.time()
-while not got and time.time() - t < 20:
+while not got and time.time() - t < 75:   # la ESP32 envía cada 60 s
     time.sleep(0.5)
 c.loop_stop()
 if not got:
@@ -119,7 +119,7 @@ PY
 )
   case "$R" in
     OK*) set -- $R; ok "Llegan datos a trigal/estacion1/datos ($2 campos)"; echo "     campos: ${R#OK * }";;
-    NADA) mal "No llegó ningún dato en 20 s" "journalctl -u trigal-serial -n 30";;
+    NADA) mal "No llegó ningún dato en 75 s (la ESP32 envía cada 60 s)" "journalctl -u trigal-serial -n 30";;
     *) mal "Prueba MQTT falló: $R";;
   esac
 else
