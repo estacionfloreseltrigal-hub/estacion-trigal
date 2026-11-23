@@ -91,9 +91,9 @@ copiar "$NR/settings.js" "$REPO/node-red/settings.js"
 # 8. InfluxDB: la tarea indices_diarios tal como está guardada
 echo "8. InfluxDB"
 if [ -z "$RAIZ" ] && docker exec influxdb influx task list --json > /tmp/tareas.json 2>/dev/null; then
-  python3 - "$REPO/influxdb" < /tmp/tareas.json <<'PY' && echo "   tareas de InfluxDB copiadas"
+  TAREAS=/tmp/tareas.json python3 - "$REPO/influxdb" <<'PY' && echo "   tareas de InfluxDB copiadas"
 import sys, json, os
-for t in json.load(sys.stdin):
+for t in json.load(open(os.environ["TAREAS"])):
     if t.get("flux"):
         open(os.path.join(sys.argv[1], t["name"] + ".flux"), "w").write(t["flux"])
 PY

@@ -23,11 +23,11 @@ Sensores → ESP32-S3 ──USB── Raspberry Pi 4 ── Mosquitto → Node-R
 | `raspberry/udev/` | Regla que crea `/dev/esp32` | `/etc/udev/rules.d/` |
 | `raspberry/sistema/` | Registros persistentes (journald) | `/etc/systemd/journald.conf.d/` |
 | `docker/` | YML de cada contenedor y `mosquitto.conf` | `/opt/trigal/stacks/`, `/opt/trigal/mosquitto/config/` |
-| `node-red/` | Flujos (estación, ciclos, descargas) y `settings.js` | `/opt/trigal/nodered/data/` |
+| `node-red/` | `flows.json` (estación, ciclos, descargas), `settings.js` y `package.json` | `/opt/trigal/nodered/data/` |
 | `influxdb/` | Tarea `indices_diarios` (Tmáx, Tmín, DLI, fotoperiodo) | InfluxDB → Tasks |
-| `grafana/dashboards/` | Tableros `trigal-estacion` y `trigal-administracion` | Grafana → Import |
+| `grafana/dashboards/` | Tableros *Estación Trigal* y *Estación Trigal - Administración* | Grafana → Import |
 
-Qué archivo viene de dónde y qué falta todavía (flujos de ciclos/descargas y tableros de Grafana): [`RESCATE.md`](RESCATE.md).
+Qué archivo viene de dónde y cómo se comparó con la Pi: [`RESCATE.md`](RESCATE.md). Contenedores que corren: `docker/contenedores.txt`.
 
 La instalación desde cero, los accesos, el uso del tablero y la solución de problemas están en
 [`docs/manual-tecnico.md`](docs/manual-tecnico.md) (sección 14: respaldo y reinstalación).

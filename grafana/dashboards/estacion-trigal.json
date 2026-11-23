@@ -1,0 +1,3579 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Tablero único: estado, cámara, ambiente, índices del ciclo, DPV, suelo y sistema.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": false,
+      "tags": [
+        "administracion"
+      ],
+      "targetBlank": false,
+      "title": "Administración",
+      "tooltip": "Formularios del ciclo y descarga de datos",
+      "type": "dashboards",
+      "url": ""
+    }
+  ],
+  "liveNow": false,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 55,
+      "title": "Estado de la estación y ciclo",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "dg42nt77i718gb"
+      },
+      "description": "Si la estación pasó más de 6 h sin datos, pide confirmar si sigue en el mismo lote. Se resuelve en el formulario del ciclo.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 1,
+          "mappings": [
+            {
+              "options": {
+                "match": "empty",
+                "result": {
+                  "color": "green",
+                  "index": 0,
+                  "text": "Sin avisos"
+                }
+              },
+              "type": "special"
+            },
+            {
+              "options": {
+                "match": "null",
+                "result": {
+                  "color": "green",
+                  "index": 1,
+                  "text": "Sin avisos"
+                }
+              },
+              "type": "special"
+            }
+          ],
+          "noValue": "Sin avisos",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "none"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 0,
+        "y": 1
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "query": "from(bucket: \"estacion\")\n  |> range(start: 2020-01-01T00:00:00Z)\n  |> filter(fn: (r) => r._measurement == \"estado_estacion\" and r._field == \"mensaje\")\n  |> last()\n  |> keep(columns: [\"_value\"])\n  |> rename(columns: {_value: \"Aviso\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "Aviso de lote",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "dg42nt77i718gb"
+      },
+      "description": "Tiempo desde el último dato que llegó de la ESP32. Rojo: más de 10 minutos sin datos.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "noValue": "Más de 7 días",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 600
+              }
+            ]
+          },
+          "unit": "dtdurations"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 5,
+        "y": 1
+      },
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "query": "from(bucket: \"estacion\")\n  |> range(start: -7d)\n  |> filter(fn: (r) => r._measurement == \"datos\" and r._field == \"temp_caja\")\n  |> last()\n  |> map(fn: (r) => ({_value: float(v: uint(v: now()) - uint(v: r._time)) / 1000000000.0}))\n  |> rename(columns: {_value: \"Última lectura\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "Última lectura",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "dg42nt77i718gb"
+      },
+      "description": "Datos del ciclo elegido arriba en la lista \"Ciclo / lote\".",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "text",
+            "mode": "fixed"
+          },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "none"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 16,
+        "x": 8,
+        "y": 1
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/.*/",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value_and_name",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "query": "import \"array\"\nimport \"date\"\nimport \"timezone\"\noption location = timezone.location(name: \"America/Bogota\")\n\nc = from(bucket: \"estacion\")\n  |> range(start: 2020-01-01T00:00:00Z)\n  |> filter(fn: (r) => r._measurement == \"ciclos\" and r.ciclo == \"${ciclo}\")\n  |> last()\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> findRecord(fn: (key) => true, idx: 0)\n\nTB = c.tbase\ninicio = time(v: c.inicio + \"T00:00:00-05:00\")\nfin = if c.fin == \"\" then now() else date.add(d: 1d, to: time(v: c.fin + \"T00:00:00-05:00\"))\n\ndiario = (f) => from(bucket: \"estacion\")\n  |> range(start: inicio, stop: fin)\n  |> filter(fn: (r) => r._measurement == \"diario\" and r._field == f)\n  |> keep(columns: [\"_time\", \"_value\"])\n\ndias = (int(v: fin) - int(v: inicio) + 86399999999999) / 86400000000000\narray.from(rows: [{Lote: c.lote, Ubicacion: c.ubicacion, Inicio: c.inicio, Fin: if c.fin == \"\" then \"en curso\" else c.fin, Tbase: TB, Dias: dias}])\n  |> rename(columns: {Ubicacion: \"Ubicación\", Tbase: \"T-base (°C)\", Dias: \"Días del ciclo\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "Ciclo seleccionado",
+      "type": "stat"
+    },
+    {
+      "gridPos": {
+        "h": 2,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "id": 6,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "Los índices (GDD, DLI, fotoperiodo) se calculan cada noche a las 00:10 con el día anterior. El **ciclo / lote** se elige arriba.",
+        "mode": "markdown"
+      },
+      "pluginVersion": "13.3.0",
+      "targets": [],
+      "title": "",
+      "transparent": true,
+      "type": "text"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 7
+      },
+      "id": 56,
+      "title": "Cámara",
+      "type": "row"
+    },
+    {
+      "gridPos": {
+        "h": 10,
+        "w": 15,
+        "x": 0,
+        "y": 8
+      },
+      "id": 8,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "<div style=\"height:100%;display:flex;flex-direction:column;gap:6px\">\n  <img id=\"fotoBase\" data-cam=\"https://cam.trigal-digital.com/<CAM_CLAVE>\" style=\"display:none\" src=\"data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7\" onload=\"var b=location.hostname.endsWith('trigal-digital.com')?this.dataset.cam:'http://'+location.hostname+':3333';this.dataset.base=b;document.getElementById('fotoBlanca').src=b+'/foto/ultima/blanca.jpg?t='+Date.now();document.getElementById('fotoUV').src=b+'/foto/ultima/uv.jpg?t='+Date.now()\">\n  <div style=\"display:flex;gap:8px;align-items:center\">\n    <button style=\"padding:4px 12px\" onclick=\"var m=document.getElementById('fotoMsg'),b=document.getElementById('fotoBase').dataset.base;m.textContent='Tomando fotos...';fetch(b+'/foto',{method:'POST'}).then(function(r){return r.json()}).then(function(d){m.textContent=d.msg;setTimeout(function(){['fotoBlanca','fotoUV'].forEach(function(id){var i=document.getElementById(id);i.src=i.src.split('?')[0]+'?t='+Date.now()});m.textContent='Fotos actualizadas'},12000)}).catch(function(){m.textContent='Sin conexión con la cámara'})\">Tomar foto ahora</button>\n    <span id=\"fotoMsg\" style=\"opacity:.7\"></span>\n  </div>\n  <div style=\"flex:1;min-height:0;display:flex;gap:6px\">\n    <img id=\"fotoBlanca\" alt=\"Sin fotos aún\" style=\"flex:1;min-width:0;object-fit:contain\" onload=\"var s=this;clearTimeout(s._t);s._t=setTimeout(function(){s.src=s.src.split('?')[0]+'?t='+Date.now()},300000)\">\n    <img id=\"fotoUV\" alt=\"Sin fotos aún\" style=\"flex:1;min-width:0;object-fit:contain\" onload=\"var s=this;clearTimeout(s._t);s._t=setTimeout(function(){s.src=s.src.split('?')[0]+'?t='+Date.now()},300000)\">\n  </div>\n</div>",
+        "mode": "markdown"
+      },
+      "pluginVersion": "13.3.0",
+      "targets": [],
+      "title": "Últimas fotos (LED blanco y UV)",
+      "type": "text"
+    },
+    {
+      "gridPos": {
+        "h": 10,
+        "w": 9,
+        "x": 15,
+        "y": 8
+      },
+      "id": 9,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "<div style=\"height:100%;display:flex;flex-direction:column;gap:6px\">\n  <div style=\"display:flex;gap:6px\">\n    <button style=\"padding:4px 12px\" onclick=\"var i=document.getElementById('camTrigal'),m=document.getElementById('camMsg'),b=location.hostname.endsWith('trigal-digital.com')?i.dataset.cam:'http://'+location.hostname+':3333';m.style.display='none';i.style.display='block';i.src=b+'/video_feed?fps=15&t='+Date.now()\">Calibrar</button>\n    <button style=\"padding:4px 12px\" onclick=\"var i=document.getElementById('camTrigal'),m=document.getElementById('camMsg'),b=location.hostname.endsWith('trigal-digital.com')?i.dataset.cam:'http://'+location.hostname+':3333';m.style.display='none';i.style.display='block';i.src=b+'/video_lite?fps=5&t='+Date.now()\">Ver en tiempo real</button>\n    <button style=\"padding:4px 12px\" onclick=\"var i=document.getElementById('camTrigal'),m=document.getElementById('camMsg');i.removeAttribute('src');i.style.display='none';m.textContent='Cámara apagada';m.style.display='flex'\">Apagar</button>\n  </div>\n  <img id=\"camTrigal\" data-cam=\"https://cam.trigal-digital.com/<CAM_CLAVE>\" style=\"display:none;flex:1;min-height:0;width:100%;object-fit:contain\"\n       onerror=\"if(!this.getAttribute('src'))return;this.style.display='none';var m=document.getElementById('camMsg');m.textContent='Sin conexión con la cámara';m.style.display='flex'\">\n  <div id=\"camMsg\" style=\"flex:1;display:flex;align-items:center;justify-content:center;opacity:.6;font-size:16px\">Cámara apagada: presiona Calibrar o Ver en tiempo real</div>\n</div>",
+        "mode": "html"
+      },
+      "pluginVersion": "13.3.0",
+      "targets": [],
+      "title": "Cámara en vivo",
+      "type": "text"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      },
+      "id": 57,
+      "title": "Ambiente (valores actuales)",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "dg42nt77i718gb"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "celsius"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 19
+      },
+      "id": 11,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "query": "from(bucket: \"estacion\")\n  |> range(start: -10m)\n  |> filter(fn: (r) => r._measurement == \"datos\" and r._field == \"temperatura\")\n  |> last()\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"Temperatura\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "Temperatura",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "dg42nt77i718gb"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 90
+              }
+            ]
+          },
+          "unit": "humidity"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 19
+      },
+      "id": 12,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "query": "from(bucket: \"estacion\")\n  |> range(start: -10m)\n  |> filter(fn: (r) => r._measurement == \"datos\" and r._field == \"humedad\")\n  |> last()\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"Humedad\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "Humedad relativa",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "dg42nt77i718gb"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "ppm"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 19
+      },
+      "id": 13,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "query": "from(bucket: \"estacion\")\n  |> range(start: -10m)\n  |> filter(fn: (r) => r._measurement == \"datos\" and r._field == \"co2\")\n  |> last()\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"CO₂\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "CO₂",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "dg42nt77i718gb"
+      },
+      "description": "Promedio de los últimos 15 min.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": 0
+              },
+              {
+                "color": "yellow",
+                "value": 0.4
+              },
+              {
+                "color": "green",
+                "value": 0.8
+              },
+              {
+                "color": "orange",
+                "value": 1.2
+              },
+              {
+                "color": "red",
+                "value": 1.5
+              }
+            ]
+          },
+          "unit": "pressurekpa"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 19
+      },
+      "id": 14,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "query": "from(bucket: \"estacion\")\n  |> range(start: -15m)\n  |> filter(fn: (r) => r._measurement == \"datos\" and r._field == \"dpv\")\n  |> mean()\n  |> keep(columns: [\"_value\"])\n  |> rename(columns: {_value: \"DPV\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "DPV (15 min)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "dg42nt77i718gb"
+      },
+      "description": "Grados que le faltan al aire para condensar. Rojo (< 1 °C): riesgo de hoja mojada.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "green",
+                "value": 3
+              }
+            ]
+          },
+          "unit": "celsius"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 19
+      },
+      "id": 15,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "query": "from(bucket: \"estacion\")\n  |> range(start: -10m)\n  |> filter(fn: (r) => r._measurement == \"datos\" and r._field == \"margen_rocio\")\n  |> last()\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"Margen\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "Margen al punto de rocío",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "dg42nt77i718gb"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "suffix: µmol/m²/s"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 19
+      },
+      "id": 16,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "query": "from(bucket: \"estacion\")\n  |> range(start: -10m)\n  |> filter(fn: (r) => r._measurement == \"datos\" and r._field == \"par\")\n  |> last()\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"PAR\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "PAR",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "dg42nt77i718gb"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "celsius"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 23
+      },
+      "id": 17,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "13.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "query": "from(bucket: \"estacion\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"datos\" and r._field == \"temperatura\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"Temperatura\"})",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "query": "from(bucket: \"estacion\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"datos\" and r._field == \"punto_rocio\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"Punto de rocío\"})",
+          "refId": "B"
+        }
+      ],
+      "title": "Temperatura y punto de rocío",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "dg42nt77i718gb"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "humidity"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 23
+      },
+      "id": 18,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "13.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "query": "from(bucket: \"estacion\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"datos\" and r._field == \"humedad\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"Humedad\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "Humedad relativa",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "dg42nt77i718gb"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "ppm"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 31
+      },
+      "id": 19,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "13.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "query": "from(bucket: \"estacion\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"datos\" and r._field == \"co2\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"CO₂\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "CO₂",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "dg42nt77i718gb"
+      },
+      "description": "PAR en µmol/m²/s (eje izquierdo) y lux (eje derecho).",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "PAR"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "suffix: µmol/m²/s"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Lux"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "lux"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 31
+      },
+      "id": 20,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "13.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "query": "from(bucket: \"estacion\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"datos\" and r._field == \"par\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"PAR\"})",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "query": "from(bucket: \"estacion\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"datos\" and r._field == \"lux\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"Lux\"})",
+          "refId": "B"
+        }
+      ],
+      "title": "Luz: PAR e iluminancia",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 39
+      },
+      "id": 58,
+      "title": "Índices del ciclo (GDD, DLI, fotoperiodo)",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "dg42nt77i718gb"
+      },
+      "description": "Σ GDD diarios desde el inicio del ciclo. GDD = (Tmáx + Tmín)/2 − T-base; si da negativo, cuenta 0.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "none"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 40
+      },
+      "id": 22,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "query": "import \"array\"\nimport \"date\"\nimport \"timezone\"\noption location = timezone.location(name: \"America/Bogota\")\n\nc = from(bucket: \"estacion\")\n  |> range(start: 2020-01-01T00:00:00Z)\n  |> filter(fn: (r) => r._measurement == \"ciclos\" and r.ciclo == \"${ciclo}\")\n  |> last()\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> findRecord(fn: (key) => true, idx: 0)\n\nTB = c.tbase\ninicio = time(v: c.inicio + \"T00:00:00-05:00\")\nfin = if c.fin == \"\" then now() else date.add(d: 1d, to: time(v: c.fin + \"T00:00:00-05:00\"))\n\ndiario = (f) => from(bucket: \"estacion\")\n  |> range(start: inicio, stop: fin)\n  |> filter(fn: (r) => r._measurement == \"diario\" and r._field == f)\n  |> keep(columns: [\"_time\", \"_value\"])\n\ndiario(f: \"tmedia\")\n  |> map(fn: (r) => ({r with _value: if r._value > TB then r._value - TB else 0.0}))\n  |> sum()\n  |> rename(columns: {_value: \"GDD acumulado\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "GDD acumulado",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "dg42nt77i718gb"
+      },
+      "description": "Promedio diario del ciclo, mol/m²/d. Referencia: 10-12 como mínimo.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 10
+              },
+              {
+                "color": "green",
+                "value": 12
+              }
+            ]
+          },
+          "unit": "none"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 40
+      },
+      "id": 23,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "query": "import \"array\"\nimport \"date\"\nimport \"timezone\"\noption location = timezone.location(name: \"America/Bogota\")\n\nc = from(bucket: \"estacion\")\n  |> range(start: 2020-01-01T00:00:00Z)\n  |> filter(fn: (r) => r._measurement == \"ciclos\" and r.ciclo == \"${ciclo}\")\n  |> last()\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> findRecord(fn: (key) => true, idx: 0)\n\nTB = c.tbase\ninicio = time(v: c.inicio + \"T00:00:00-05:00\")\nfin = if c.fin == \"\" then now() else date.add(d: 1d, to: time(v: c.fin + \"T00:00:00-05:00\"))\n\ndiario = (f) => from(bucket: \"estacion\")\n  |> range(start: inicio, stop: fin)\n  |> filter(fn: (r) => r._measurement == \"diario\" and r._field == f)\n  |> keep(columns: [\"_time\", \"_value\"])\n\ndiario(f: \"dli\")\n  |> mean()\n  |> rename(columns: {_value: \"DLI promedio\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "DLI promedio",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "dg42nt77i718gb"
+      },
+      "description": "mol/m² acumulados desde las 00:00. El valor del día queda fijo a las 00:10.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "none"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 40
+      },
+      "id": 24,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "query": "import \"date\"\nimport \"timezone\"\noption location = timezone.location(name: \"America/Bogota\")\n\nfrom(bucket: \"estacion\")\n  |> range(start: date.truncate(t: now(), unit: 1d), stop: now())\n  |> filter(fn: (r) => r._measurement == \"datos\" and r._field == \"par\")\n  |> elapsed(unit: 1s)\n  |> map(fn: (r) => ({r with _value: (if r._value > 0.0 then r._value else 0.0) * (if r.elapsed > 60 then 60.0 else float(v: r.elapsed)) / 1000000.0}))\n  |> sum()\n  |> keep(columns: [\"_value\"])\n  |> rename(columns: {_value: \"DLI de hoy\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "DLI de hoy (hasta ahora)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "dg42nt77i718gb"
+      },
+      "description": "Hora fin de luz − hora inicio de luz. Luz efectiva: PAR ≥ 2 µmol/m²/s (o ≥ 108 lux si no hay PAR) durante un minuto completo.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "dthms"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 40
+      },
+      "id": 25,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "query": "import \"array\"\nimport \"date\"\nimport \"timezone\"\noption location = timezone.location(name: \"America/Bogota\")\n\nc = from(bucket: \"estacion\")\n  |> range(start: 2020-01-01T00:00:00Z)\n  |> filter(fn: (r) => r._measurement == \"ciclos\" and r.ciclo == \"${ciclo}\")\n  |> last()\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> findRecord(fn: (key) => true, idx: 0)\n\nTB = c.tbase\ninicio = time(v: c.inicio + \"T00:00:00-05:00\")\nfin = if c.fin == \"\" then now() else date.add(d: 1d, to: time(v: c.fin + \"T00:00:00-05:00\"))\n\ndiario = (f) => from(bucket: \"estacion\")\n  |> range(start: inicio, stop: fin)\n  |> filter(fn: (r) => r._measurement == \"diario\" and r._field == f)\n  |> keep(columns: [\"_time\", \"_value\"])\n\nfrom(bucket: \"estacion\")\n  |> range(start: inicio, stop: fin)\n  |> filter(fn: (r) => r._measurement == \"diario\" and (r._field == \"fotoperiodo\" or r._field == \"fotoperiodo_lux\"))\n  |> keep(columns: [\"_time\", \"_field\", \"_value\"])\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> map(fn: (r) => ({_time: r._time, _value: if exists r.fotoperiodo then r.fotoperiodo else r.fotoperiodo_lux}))\n  |> last()\n  |> rename(columns: {_value: \"Fotoperiodo\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "Fotoperiodo (último día)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "dg42nt77i718gb"
+      },
+      "description": "Minutos que cambió el fotoperiodo respecto al día anterior.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "m"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 40
+      },
+      "id": 26,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "query": "import \"array\"\nimport \"date\"\nimport \"timezone\"\noption location = timezone.location(name: \"America/Bogota\")\n\nc = from(bucket: \"estacion\")\n  |> range(start: 2020-01-01T00:00:00Z)\n  |> filter(fn: (r) => r._measurement == \"ciclos\" and r.ciclo == \"${ciclo}\")\n  |> last()\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> findRecord(fn: (key) => true, idx: 0)\n\nTB = c.tbase\ninicio = time(v: c.inicio + \"T00:00:00-05:00\")\nfin = if c.fin == \"\" then now() else date.add(d: 1d, to: time(v: c.fin + \"T00:00:00-05:00\"))\n\ndiario = (f) => from(bucket: \"estacion\")\n  |> range(start: inicio, stop: fin)\n  |> filter(fn: (r) => r._measurement == \"diario\" and r._field == f)\n  |> keep(columns: [\"_time\", \"_value\"])\n\nfrom(bucket: \"estacion\")\n  |> range(start: inicio, stop: fin)\n  |> filter(fn: (r) => r._measurement == \"diario\" and (r._field == \"fotoperiodo\" or r._field == \"fotoperiodo_lux\"))\n  |> keep(columns: [\"_time\", \"_field\", \"_value\"])\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> map(fn: (r) => ({_time: r._time, _value: if exists r.fotoperiodo then r.fotoperiodo else r.fotoperiodo_lux}))\n  |> sort(columns: [\"_time\"])\n  |> difference()\n  |> map(fn: (r) => ({r with _value: r._value / 60.0}))\n  |> last()\n  |> rename(columns: {_value: \"Cambio vs día anterior\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "Cambio del fotoperiodo",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "dg42nt77i718gb"
+      },
+      "description": "Menor margen al rocío de las últimas 24 h: si bajó de 1 °C hubo condensación probable.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "green",
+                "value": 3
+              }
+            ]
+          },
+          "unit": "celsius"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 40
+      },
+      "id": 27,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "query": "from(bucket: \"estacion\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"datos\" and r._field == \"margen_rocio\")\n  |> min()\n  |> keep(columns: [\"_value\"])\n  |> rename(columns: {_value: \"Mínimo\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "Margen al punto de rocío (mín. 24 h)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "dg42nt77i718gb"
+      },
+      "description": "Grados-día acumulados desde el inicio del ciclo, con la T-base del ciclo.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "orange",
+            "mode": "fixed"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisSoftMin": 0,
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "_time"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "time:DD/MM"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 44
+      },
+      "id": 28,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.8,
+        "fullHighlight": false,
+        "groupWidth": 0.8,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "vertical",
+        "showValue": "never",
+        "stacking": "none",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xField": "_time",
+        "xTickLabelRotation": -45,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "13.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "query": "import \"array\"\nimport \"date\"\nimport \"timezone\"\noption location = timezone.location(name: \"America/Bogota\")\n\nc = from(bucket: \"estacion\")\n  |> range(start: 2020-01-01T00:00:00Z)\n  |> filter(fn: (r) => r._measurement == \"ciclos\" and r.ciclo == \"${ciclo}\")\n  |> last()\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> findRecord(fn: (key) => true, idx: 0)\n\nTB = c.tbase\ninicio = time(v: c.inicio + \"T00:00:00-05:00\")\nfin = if c.fin == \"\" then now() else date.add(d: 1d, to: time(v: c.fin + \"T00:00:00-05:00\"))\n\ndiario = (f) => from(bucket: \"estacion\")\n  |> range(start: inicio, stop: fin)\n  |> filter(fn: (r) => r._measurement == \"diario\" and r._field == f)\n  |> keep(columns: [\"_time\", \"_value\"])\n\ndiario(f: \"tmedia\")\n  |> map(fn: (r) => ({r with _value: if r._value > TB then r._value - TB else 0.0}))\n  |> cumulativeSum()\n  |> rename(columns: {_value: \"GDD acumulado\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "GDD acumulado por día",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "dg42nt77i718gb"
+      },
+      "description": "Σ (PPFD × Δt) / 1 000 000. Líneas: 10 y 12 mol/m²/d.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "yellow",
+            "mode": "fixed"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisSoftMin": 0,
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "transparent",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 10
+              },
+              {
+                "color": "green",
+                "value": 12
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "_time"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "time:DD/MM"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 44
+      },
+      "id": 29,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.8,
+        "fullHighlight": false,
+        "groupWidth": 0.8,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "vertical",
+        "showValue": "never",
+        "stacking": "none",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xField": "_time",
+        "xTickLabelRotation": -45,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "13.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "query": "import \"array\"\nimport \"date\"\nimport \"timezone\"\noption location = timezone.location(name: \"America/Bogota\")\n\nc = from(bucket: \"estacion\")\n  |> range(start: 2020-01-01T00:00:00Z)\n  |> filter(fn: (r) => r._measurement == \"ciclos\" and r.ciclo == \"${ciclo}\")\n  |> last()\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> findRecord(fn: (key) => true, idx: 0)\n\nTB = c.tbase\ninicio = time(v: c.inicio + \"T00:00:00-05:00\")\nfin = if c.fin == \"\" then now() else date.add(d: 1d, to: time(v: c.fin + \"T00:00:00-05:00\"))\n\ndiario = (f) => from(bucket: \"estacion\")\n  |> range(start: inicio, stop: fin)\n  |> filter(fn: (r) => r._measurement == \"diario\" and r._field == f)\n  |> keep(columns: [\"_time\", \"_value\"])\n\ndiario(f: \"dli\")\n  |> rename(columns: {_value: \"DLI\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "DLI diario (mol/m²/d)",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "dg42nt77i718gb"
+      },
+      "description": "Horas de luz efectiva por día. El valor exacto en hh:mm:ss está en el indicador y en la tabla de resumen.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "purple",
+            "mode": "fixed"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "horas",
+            "axisPlacement": "auto",
+            "axisSoftMin": 0,
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "transparent",
+                "value": 0
+              },
+              {
+                "color": "text",
+                "value": 12
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "_time"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "time:DD/MM"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 53
+      },
+      "id": 30,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.8,
+        "fullHighlight": false,
+        "groupWidth": 0.8,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "vertical",
+        "showValue": "always",
+        "stacking": "none",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xField": "_time",
+        "xTickLabelRotation": -45,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "13.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "query": "import \"array\"\nimport \"date\"\nimport \"timezone\"\noption location = timezone.location(name: \"America/Bogota\")\n\nc = from(bucket: \"estacion\")\n  |> range(start: 2020-01-01T00:00:00Z)\n  |> filter(fn: (r) => r._measurement == \"ciclos\" and r.ciclo == \"${ciclo}\")\n  |> last()\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> findRecord(fn: (key) => true, idx: 0)\n\nTB = c.tbase\ninicio = time(v: c.inicio + \"T00:00:00-05:00\")\nfin = if c.fin == \"\" then now() else date.add(d: 1d, to: time(v: c.fin + \"T00:00:00-05:00\"))\n\ndiario = (f) => from(bucket: \"estacion\")\n  |> range(start: inicio, stop: fin)\n  |> filter(fn: (r) => r._measurement == \"diario\" and r._field == f)\n  |> keep(columns: [\"_time\", \"_value\"])\n\nfrom(bucket: \"estacion\")\n  |> range(start: inicio, stop: fin)\n  |> filter(fn: (r) => r._measurement == \"diario\" and (r._field == \"fotoperiodo\" or r._field == \"fotoperiodo_lux\"))\n  |> keep(columns: [\"_time\", \"_field\", \"_value\"])\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> map(fn: (r) => ({_time: r._time, _value: if exists r.fotoperiodo then r.fotoperiodo else r.fotoperiodo_lux}))\n  |> map(fn: (r) => ({r with _value: r._value / 3600.0}))\n  |> rename(columns: {_value: \"Horas de luz\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "Fotoperiodo diario (horas)",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "dg42nt77i718gb"
+      },
+      "description": "Días con menos de 23 h de datos en rojo: su DLI puede salir bajo. \"Luz medida con\" indica si el fotoperiodo salió del PAR o de los lux.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "center",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false,
+            "minWidth": 70
+          },
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Fecha"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "time:DD/MM/YYYY"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "Inicio luz|Fin luz|Fotoperiodo"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dthms"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Horas con datos"
+            },
+            "properties": [
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": 0
+                    },
+                    {
+                      "color": "green",
+                      "value": 23
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 61
+      },
+      "id": 31,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true,
+        "zebraStriping": false
+      },
+      "pluginVersion": "13.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "query": "import \"array\"\nimport \"date\"\nimport \"timezone\"\noption location = timezone.location(name: \"America/Bogota\")\n\nc = from(bucket: \"estacion\")\n  |> range(start: 2020-01-01T00:00:00Z)\n  |> filter(fn: (r) => r._measurement == \"ciclos\" and r.ciclo == \"${ciclo}\")\n  |> last()\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> findRecord(fn: (key) => true, idx: 0)\n\nTB = c.tbase\ninicio = time(v: c.inicio + \"T00:00:00-05:00\")\nfin = if c.fin == \"\" then now() else date.add(d: 1d, to: time(v: c.fin + \"T00:00:00-05:00\"))\n\ndiario = (f) => from(bucket: \"estacion\")\n  |> range(start: inicio, stop: fin)\n  |> filter(fn: (r) => r._measurement == \"diario\" and r._field == f)\n  |> keep(columns: [\"_time\", \"_value\"])\n\nfrom(bucket: \"estacion\")\n  |> range(start: inicio, stop: fin)\n  |> filter(fn: (r) => r._measurement == \"diario\")\n  |> keep(columns: [\"_time\", \"_field\", \"_value\"])\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> map(fn: (r) => ({\n      _time: r._time,\n      tmax: r.tmax, tmin: r.tmin, tmedia: r.tmedia,\n      gdd: if exists r.tmedia then (if r.tmedia > TB then r.tmedia - TB else 0.0) else 0.0,\n      dli: r.dli,\n      ini: if exists r.inicio_luz then r.inicio_luz else r.inicio_luz_lux,\n      fil: if exists r.fin_luz then r.fin_luz else r.fin_luz_lux,\n      foto: if exists r.fotoperiodo then r.fotoperiodo else if exists r.fotoperiodo_lux then r.fotoperiodo_lux else 0.0,\n      fuente: if exists r.fotoperiodo then \"PAR\" else if exists r.fotoperiodo_lux then \"lux\" else \"sin datos\",\n      horas: r.horas_datos}))\n  |> sort(columns: [\"_time\"])\n  |> duplicate(column: \"gdd\", as: \"gdd_acum\")\n  |> cumulativeSum(columns: [\"gdd_acum\"])\n  |> duplicate(column: \"foto\", as: \"cambio\")\n  |> difference(columns: [\"cambio\"], keepFirst: true)\n  |> map(fn: (r) => ({r with cambio: r.cambio / 60.0}))\n  |> rename(columns: {_time: \"Fecha\", tmax: \"T máx\", tmin: \"T mín\", tmedia: \"T media\", gdd: \"GDD día\", gdd_acum: \"GDD acumulado\",\n      dli: \"DLI\", ini: \"Inicio luz\", fil: \"Fin luz\", foto: \"Fotoperiodo\", cambio: \"Cambio (min)\", fuente: \"Luz medida con\", horas: \"Horas con datos\"})\n  |> sort(columns: [\"Fecha\"], desc: true)",
+          "refId": "A"
+        }
+      ],
+      "title": "Resumen diario del ciclo",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "indexByName": {
+              "Cambio (min)": 10,
+              "DLI": 6,
+              "Fecha": 0,
+              "Fin luz": 8,
+              "Fotoperiodo": 9,
+              "GDD acumulado": 5,
+              "GDD día": 4,
+              "Horas con datos": 12,
+              "Inicio luz": 7,
+              "Luz medida con": 11,
+              "T media": 3,
+              "T máx": 1,
+              "T mín": 2
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 71
+      },
+      "id": 59,
+      "title": "Déficit de presión de vapor (cada 15 min)",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "dg42nt77i718gb"
+      },
+      "description": "SVP = 0,6108·exp(17,27·T/(T+237,3)); DPV = SVP·(1 − HR/100).",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "text",
+            "mode": "fixed"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "area"
+            }
+          },
+          "decimals": 2,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": 0
+              },
+              {
+                "color": "yellow",
+                "value": 0.4
+              },
+              {
+                "color": "green",
+                "value": 0.8
+              },
+              {
+                "color": "orange",
+                "value": 1.2
+              },
+              {
+                "color": "red",
+                "value": 1.5
+              }
+            ]
+          },
+          "unit": "pressurekpa"
+        }
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 16,
+        "x": 0,
+        "y": 72
+      },
+      "id": 33,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "13.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "query": "from(bucket: \"estacion\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"datos\" and r._field == \"dpv\")\n  |> aggregateWindow(every: 15m, fn: mean, createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"DPV (promedio 15 min)\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "DPV (kPa), promedio cada 15 min",
+      "type": "timeseries"
+    },
+    {
+      "gridPos": {
+        "h": 11,
+        "w": 8,
+        "x": 16,
+        "y": 72
+      },
+      "id": 34,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "**Para qué sirve el DPV**\n\nIndica qué tan \"seco\" está el aire para la planta, combinando temperatura y humedad.\n\n- **< 0,4 kPa:** aire casi saturado. La planta casi no transpira y el agua se condensa en hojas y flores: riesgo de botrytis y otros hongos. Ventilar o calentar.\n- **0,4 – 0,8 kPa:** bajo; aceptable en plántulas y enraizamiento.\n- **0,8 – 1,2 kPa:** rango saludable para crecimiento y floración.\n- **1,2 – 1,5 kPa:** alto; vigilar riego.\n- **> 1,5 kPa:** la planta cierra estomas y baja la fotosíntesis. Nebulizar, sombrear o regar.\n\nSe usa para decidir ventilación, cortinas, nebulización y momento de riego.",
+        "mode": "markdown"
+      },
+      "pluginVersion": "13.3.0",
+      "targets": [],
+      "title": "Cómo leer el DPV",
+      "type": "text"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 83
+      },
+      "id": 60,
+      "title": "Suelo (3 sondas)",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "dg42nt77i718gb"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": 1200000,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "percent"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 84
+      },
+      "id": 36,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "13.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "query": "from(bucket: \"estacion\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"datos\" and r._field == \"s1_humedad\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"Sonda 1\"})",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "query": "from(bucket: \"estacion\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"datos\" and r._field == \"s2_humedad\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"Sonda 2\"})",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "query": "from(bucket: \"estacion\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"datos\" and r._field == \"s3_humedad\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"Sonda 3\"})",
+          "refId": "C"
+        }
+      ],
+      "title": "Humedad del suelo",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "dg42nt77i718gb"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": 1200000,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "celsius"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 84
+      },
+      "id": 37,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "13.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "query": "from(bucket: \"estacion\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"datos\" and r._field == \"s1_temp\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"Sonda 1\"})",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "query": "from(bucket: \"estacion\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"datos\" and r._field == \"s2_temp\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"Sonda 2\"})",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "query": "from(bucket: \"estacion\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"datos\" and r._field == \"s3_temp\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"Sonda 3\"})",
+          "refId": "C"
+        }
+      ],
+      "title": "Temperatura del suelo",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "dg42nt77i718gb"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": 1200000,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "suffix: µS/cm"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 92
+      },
+      "id": 38,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "13.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "query": "from(bucket: \"estacion\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"datos\" and r._field == \"s1_ce\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"Sonda 1\"})",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "query": "from(bucket: \"estacion\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"datos\" and r._field == \"s2_ce\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"Sonda 2\"})",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "query": "from(bucket: \"estacion\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"datos\" and r._field == \"s3_ce\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"Sonda 3\"})",
+          "refId": "C"
+        }
+      ],
+      "title": "Conductividad eléctrica",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "dg42nt77i718gb"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": 1200000,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "none"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 92
+      },
+      "id": 39,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "13.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "query": "from(bucket: \"estacion\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"datos\" and r._field == \"s1_ph\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"Sonda 1\"})",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "query": "from(bucket: \"estacion\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"datos\" and r._field == \"s2_ph\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"Sonda 2\"})",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "query": "from(bucket: \"estacion\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"datos\" and r._field == \"s3_ph\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"Sonda 3\"})",
+          "refId": "C"
+        }
+      ],
+      "title": "pH del suelo",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 100
+      },
+      "id": 61,
+      "panels": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "decimals": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 35
+                  },
+                  {
+                    "color": "red",
+                    "value": 40
+                  }
+                ]
+              },
+              "unit": "celsius"
+            }
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 0,
+            "y": 101
+          },
+          "id": 43,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "value",
+            "wideLayout": true
+          },
+          "pluginVersion": "",
+          "targets": [
+            {
+              "datasource": {
+                "type": "influxdb",
+                "uid": "dg42nt77i718gb"
+              },
+              "query": "from(bucket: \"estacion\")\n  |> range(start: -10m)\n  |> filter(fn: (r) => r._measurement == \"datos\" and r._field == \"temp_caja\")\n  |> last()\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"Caja\"})",
+              "refId": "A"
+            }
+          ],
+          "title": "Temperatura de la caja",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "decimals": 0,
+              "mappings": [
+                {
+                  "options": {
+                    "0": {
+                      "index": 0,
+                      "text": "Apagado"
+                    },
+                    "1": {
+                      "index": 1,
+                      "text": "Encendido"
+                    }
+                  },
+                  "type": "value"
+                }
+              ],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "text",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "none"
+            }
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 6,
+            "y": 101
+          },
+          "id": 44,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "value",
+            "wideLayout": true
+          },
+          "pluginVersion": "",
+          "targets": [
+            {
+              "datasource": {
+                "type": "influxdb",
+                "uid": "dg42nt77i718gb"
+              },
+              "query": "from(bucket: \"estacion\")\n  |> range(start: -10m)\n  |> filter(fn: (r) => r._measurement == \"datos\" and r._field == \"ventilador\")\n  |> last()\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"Ventilador\"})",
+              "refId": "A"
+            }
+          ],
+          "title": "Ventilador",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "description": "Estado que reporta la ESP32 para el SCD30.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "decimals": 0,
+              "mappings": [
+                {
+                  "options": {
+                    "0": {
+                      "color": "red",
+                      "index": 0,
+                      "text": "Sin conexión"
+                    },
+                    "1": {
+                      "color": "green",
+                      "index": 1,
+                      "text": "OK"
+                    }
+                  },
+                  "type": "value"
+                }
+              ],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "text",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "none"
+            }
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 12,
+            "y": 101
+          },
+          "id": 45,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "value",
+            "wideLayout": true
+          },
+          "pluginVersion": "",
+          "targets": [
+            {
+              "datasource": {
+                "type": "influxdb",
+                "uid": "dg42nt77i718gb"
+              },
+              "query": "from(bucket: \"estacion\")\n  |> range(start: -10m)\n  |> filter(fn: (r) => r._measurement == \"datos\" and r._field == \"scd\")\n  |> last()\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"scd\"})",
+              "refId": "A"
+            }
+          ],
+          "title": "SCD30 (CO₂, T, HR)",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "description": "Estado que reporta la ESP32 para el TSL2591.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "decimals": 0,
+              "mappings": [
+                {
+                  "options": {
+                    "0": {
+                      "color": "red",
+                      "index": 0,
+                      "text": "Sin conexión"
+                    },
+                    "1": {
+                      "color": "green",
+                      "index": 1,
+                      "text": "OK"
+                    }
+                  },
+                  "type": "value"
+                }
+              ],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "text",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "none"
+            }
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 18,
+            "y": 101
+          },
+          "id": 46,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "value",
+            "wideLayout": true
+          },
+          "pluginVersion": "",
+          "targets": [
+            {
+              "datasource": {
+                "type": "influxdb",
+                "uid": "dg42nt77i718gb"
+              },
+              "query": "from(bucket: \"estacion\")\n  |> range(start: -10m)\n  |> filter(fn: (r) => r._measurement == \"datos\" and r._field == \"tsl\")\n  |> last()\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"tsl\"})",
+              "refId": "A"
+            }
+          ],
+          "title": "TSL2591 (lux)",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "fillOpacity": 10,
+                "lineWidth": 2,
+                "showPoints": "never",
+                "spanNulls": false,
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "celsius"
+            }
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 105
+          },
+          "id": 47,
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": false
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "",
+          "targets": [
+            {
+              "datasource": {
+                "type": "influxdb",
+                "uid": "dg42nt77i718gb"
+              },
+              "query": "from(bucket: \"estacion\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"datos\" and r._field == \"temp_caja\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"Caja\"})",
+              "refId": "A"
+            }
+          ],
+          "title": "Temperatura de la caja (historial)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "description": "Consumo del 4G (usb0) en el día, bajada + subida, según vnstat.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "decimals": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 150
+                  },
+                  {
+                    "color": "red",
+                    "value": 300
+                  }
+                ]
+              },
+              "unit": "decmbytes"
+            }
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 4,
+            "x": 0,
+            "y": 113
+          },
+          "id": 48,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "value",
+            "wideLayout": true
+          },
+          "pluginVersion": "",
+          "targets": [
+            {
+              "datasource": {
+                "type": "influxdb",
+                "uid": "dg42nt77i718gb"
+              },
+              "query": "from(bucket: \"estacion\")\n  |> range(start: -30m)\n  |> filter(fn: (r) => r._measurement == \"sistema\" and r._field == \"datos_hoy_mb\")\n  |> last()\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"Hoy\"})",
+              "refId": "A"
+            }
+          ],
+          "title": "Datos 4G hoy",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "description": "Consumo del 4G en el mes calendario. Cambiar el Max por el tamaño del paquete de Claro en MB (los colores son % de ese máximo).",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "decimals": 0,
+              "max": 5000,
+              "min": 0,
+              "thresholds": {
+                "mode": "percentage",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 80
+                  },
+                  {
+                    "color": "red",
+                    "value": 95
+                  }
+                ]
+              },
+              "unit": "decmbytes"
+            }
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 4,
+            "x": 4,
+            "y": 113
+          },
+          "id": 49,
+          "options": {
+            "minVizHeight": 75,
+            "minVizWidth": 75,
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showThresholdLabels": false,
+            "showThresholdMarkers": true,
+            "sizing": "auto"
+          },
+          "pluginVersion": "",
+          "targets": [
+            {
+              "datasource": {
+                "type": "influxdb",
+                "uid": "dg42nt77i718gb"
+              },
+              "query": "from(bucket: \"estacion\")\n  |> range(start: -30m)\n  |> filter(fn: (r) => r._measurement == \"sistema\" and r._field == \"datos_mes_mb\")\n  |> last()\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"Mes\"})",
+              "refId": "A"
+            }
+          ],
+          "title": "Datos 4G este mes",
+          "type": "gauge"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "description": "Porcentaje usado de la microSD de la Raspberry Pi.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "decimals": 1,
+              "max": 100,
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 80
+                  },
+                  {
+                    "color": "red",
+                    "value": 90
+                  }
+                ]
+              },
+              "unit": "percent"
+            }
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 4,
+            "x": 8,
+            "y": 113
+          },
+          "id": 50,
+          "options": {
+            "minVizHeight": 75,
+            "minVizWidth": 75,
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showThresholdLabels": false,
+            "showThresholdMarkers": true,
+            "sizing": "auto"
+          },
+          "pluginVersion": "",
+          "targets": [
+            {
+              "datasource": {
+                "type": "influxdb",
+                "uid": "dg42nt77i718gb"
+              },
+              "query": "from(bucket: \"estacion\")\n  |> range(start: -30m)\n  |> filter(fn: (r) => r._measurement == \"sistema\" and r._field == \"disco_uso_pct\")\n  |> last()\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"Usado\"})",
+              "refId": "A"
+            }
+          ],
+          "title": "MicroSD usada",
+          "type": "gauge"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "description": "Espacio libre en la microSD.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "decimals": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "red",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 5
+                  },
+                  {
+                    "color": "green",
+                    "value": 10
+                  }
+                ]
+              },
+              "unit": "decgbytes"
+            }
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 4,
+            "x": 12,
+            "y": 113
+          },
+          "id": 51,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "value",
+            "wideLayout": true
+          },
+          "pluginVersion": "",
+          "targets": [
+            {
+              "datasource": {
+                "type": "influxdb",
+                "uid": "dg42nt77i718gb"
+              },
+              "query": "from(bucket: \"estacion\")\n  |> range(start: -30m)\n  |> filter(fn: (r) => r._measurement == \"sistema\" and r._field == \"disco_libre_gb\")\n  |> last()\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"Libre\"})",
+              "refId": "A"
+            }
+          ],
+          "title": "Libre en microSD",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "description": "Temperatura del procesador de la Raspberry Pi. Sobre 80 °C baja su velocidad.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "decimals": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 70
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "celsius"
+            }
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 4,
+            "x": 16,
+            "y": 113
+          },
+          "id": 52,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "value",
+            "wideLayout": true
+          },
+          "pluginVersion": "",
+          "targets": [
+            {
+              "datasource": {
+                "type": "influxdb",
+                "uid": "dg42nt77i718gb"
+              },
+              "query": "from(bucket: \"estacion\")\n  |> range(start: -30m)\n  |> filter(fn: (r) => r._measurement == \"sistema\" and r._field == \"temp_cpu\")\n  |> last()\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"CPU\"})",
+              "refId": "A"
+            }
+          ],
+          "title": "Temperatura CPU",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "description": "Bajo voltaje desde el último arranque (vcgencmd get_throttled).",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "decimals": 0,
+              "mappings": [
+                {
+                  "options": {
+                    "0": {
+                      "color": "green",
+                      "index": 0,
+                      "text": "OK"
+                    },
+                    "1": {
+                      "color": "red",
+                      "index": 1,
+                      "text": "Bajo voltaje"
+                    }
+                  },
+                  "type": "value"
+                }
+              ],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "text",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "none"
+            }
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 4,
+            "x": 20,
+            "y": 113
+          },
+          "id": 53,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "value",
+            "wideLayout": true
+          },
+          "pluginVersion": "",
+          "targets": [
+            {
+              "datasource": {
+                "type": "influxdb",
+                "uid": "dg42nt77i718gb"
+              },
+              "query": "from(bucket: \"estacion\")\n  |> range(start: -30m)\n  |> filter(fn: (r) => r._measurement == \"sistema\" and r._field == \"bajo_voltaje\")\n  |> last()\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"Voltaje\"})",
+              "refId": "A"
+            }
+          ],
+          "title": "Alimentación de la Pi",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "dg42nt77i718gb"
+          },
+          "description": "Máximo del contador diario de vnstat para cada día. Sirve para estimar el paquete de datos necesario.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "fixedColor": "blue",
+                "mode": "fixed"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "axisSoftMin": 0,
+                "fillOpacity": 80,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineWidth": 1,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "decimals": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "transparent",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "decmbytes"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "_time"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "time:DD/MM"
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 118
+          },
+          "id": 54,
+          "options": {
+            "barRadius": 0,
+            "barWidth": 0.8,
+            "fullHighlight": false,
+            "groupWidth": 0.8,
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": false
+            },
+            "orientation": "vertical",
+            "showValue": "never",
+            "stacking": "none",
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "single",
+              "sort": "none"
+            },
+            "xField": "_time",
+            "xTickLabelRotation": -45,
+            "xTickLabelSpacing": 0
+          },
+          "pluginVersion": "13.3.0",
+          "targets": [
+            {
+              "datasource": {
+                "type": "influxdb",
+                "uid": "dg42nt77i718gb"
+              },
+              "query": "import \"timezone\"\noption location = timezone.location(name: \"America/Bogota\")\n\nfrom(bucket: \"estacion\")\n  |> range(start: -30d)\n  |> filter(fn: (r) => r._measurement == \"sistema\" and r._field == \"datos_hoy_mb\")\n  |> aggregateWindow(every: 1d, fn: max, createEmpty: false, timeSrc: \"_start\")\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"MB\"})",
+              "refId": "A"
+            }
+          ],
+          "title": "Consumo 4G por día (MB)",
+          "type": "barchart"
+        }
+      ],
+      "title": "Sistema",
+      "type": "row"
+    }
+  ],
+  "preload": false,
+  "refresh": "1m",
+  "schemaVersion": 42,
+  "tags": [
+    "trigal"
+  ],
+  "templating": {
+    "list": [
+      {
+        "allowCustomValue": true,
+        "current": {
+          "text": "",
+          "value": ""
+        },
+        "datasource": {
+          "type": "influxdb",
+          "uid": "dg42nt77i718gb"
+        },
+        "definition": "import \"strings\"\nfrom(bucket: \"estacion\")\n  |> range(start: 2020-01-01T00:00:00Z)\n  |> filter(fn: (r) => r._measurement == \"ciclos\" and r._field == \"estado\")\n  |> last()\n  |> filter(fn: (r) => r._value != \"anulado\")\n  |> group()\n  |> map(fn: (r) => ({r with orden: strings.split(v: r.ciclo, t: \"_\")[1]}))\n  |> sort(columns: [\"orden\"], desc: true)\n  |> keep(columns: [\"ciclo\"])",
+        "description": "Ciclo del cultivo (lote_fecha de inicio). El primero es el más reciente.",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Ciclo / lote",
+        "multi": false,
+        "name": "ciclo",
+        "options": [],
+        "query": "import \"strings\"\nfrom(bucket: \"estacion\")\n  |> range(start: 2020-01-01T00:00:00Z)\n  |> filter(fn: (r) => r._measurement == \"ciclos\" and r._field == \"estado\")\n  |> last()\n  |> filter(fn: (r) => r._value != \"anulado\")\n  |> group()\n  |> map(fn: (r) => ({r with orden: strings.split(v: r.ciclo, t: \"_\")[1]}))\n  |> sort(columns: [\"orden\"], desc: true)\n  |> keep(columns: [\"ciclo\"])",
+        "refresh": 1,
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h",
+      "2h",
+      "1d"
+    ]
+  },
+  "timezone": "America/Bogota",
+  "title": "Estación Trigal",
+  "uid": "trigal-estacion",
+  "version": 5
+}

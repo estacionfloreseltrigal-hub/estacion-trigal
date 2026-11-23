@@ -1,0 +1,1331 @@
+[
+    {
+        "id": "tab_trigal_v2",
+        "type": "tab",
+        "label": "Estación Trigal",
+        "disabled": false,
+        "info": "Datos de la ESP32-S3 (un solo topic) con índices instantáneos (DPV, punto de rocío), guardado en InfluxDB y órdenes para los LEDs."
+    },
+    {
+        "id": "tab_ciclos",
+        "type": "tab",
+        "label": "Ciclos del cultivo",
+        "disabled": false,
+        "info": "Formulario en http://<ip-de-la-pi>:1880/ciclo para iniciar, corregir o terminar ciclos por lote. Guarda en InfluxDB (tabla ciclos) y avisa cuando la estación pasa más de 6 h sin datos."
+    },
+    {
+        "id": "tab_descargas",
+        "type": "tab",
+        "label": "Consulta y descarga",
+        "disabled": false,
+        "info": "Página en http://<ip-de-la-pi>:1880/descarga. Enlace directo para R/Python: /descarga/csv?..."
+    },
+    {
+        "id": "b_mosq_local",
+        "type": "mqtt-broker",
+        "name": "mosquitto-local",
+        "broker": "localhost",
+        "port": "1883",
+        "clientid": "",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": "5",
+        "keepalive": "60",
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closeQos": "0",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willPayload": "",
+        "willMsg": {},
+        "userProps": "",
+        "sessionExpiry": ""
+    },
+    {
+        "id": "c_influx_local",
+        "type": "influxdb",
+        "hostname": "127.0.0.1",
+        "port": "8086",
+        "protocol": "http",
+        "database": "database",
+        "name": "influxdb-local",
+        "usetls": false,
+        "tls": "",
+        "influxdbVersion": "2.0",
+        "url": "http://localhost:8086",
+        "timeout": "10",
+        "rejectUnauthorized": true
+    },
+    {
+        "id": "tv_c1",
+        "type": "comment",
+        "z": "tab_trigal_v2",
+        "name": "Datos de la estación + índices",
+        "info": "",
+        "x": 170,
+        "y": 40,
+        "wires": []
+    },
+    {
+        "id": "tv_datos",
+        "type": "mqtt in",
+        "z": "tab_trigal_v2",
+        "name": "Datos estación",
+        "topic": "trigal/estacion1/datos",
+        "qos": "1",
+        "datatype": "json",
+        "broker": "b_mosq_local",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 140,
+        "y": 100,
+        "wires": [
+            [
+                "tv_d_datos",
+                "tv_fn"
+            ]
+        ]
+    },
+    {
+        "id": "tv_d_datos",
+        "type": "debug",
+        "z": "tab_trigal_v2",
+        "name": "Ver datos",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 370,
+        "y": 60,
+        "wires": []
+    },
+    {
+        "id": "tv_fn",
+        "type": "function",
+        "z": "tab_trigal_v2",
+        "name": "Índices instantáneos",
+        "func": "const d = msg.payload;\nconst T = d.temperatura;\nconst HR = d.humedad;\n\nif (typeof T === \"number\" && typeof HR === \"number\" && HR > 0 && HR <= 100) {\n    const es = 0.6108 * Math.exp(17.27 * T / (T + 237.3));\n    d.dpv = +(es * (1 - HR / 100)).toFixed(3);\n    const g = Math.log(HR / 100) + 17.27 * T / (237.3 + T);\n    d.punto_rocio = +(237.3 * g / (17.27 - g)).toFixed(2);\n    d.margen_rocio = +(T - d.punto_rocio).toFixed(2);\n}\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 380,
+        "y": 100,
+        "wires": [
+            [
+                "tv_influx",
+                "tv_d_ind"
+            ]
+        ]
+    },
+    {
+        "id": "tv_influx",
+        "type": "influxdb out",
+        "z": "tab_trigal_v2",
+        "influxdb": "c_influx_local",
+        "name": "Guardar en InfluxDB",
+        "measurement": "datos",
+        "precision": "",
+        "retentionPolicy": "",
+        "database": "database",
+        "precisionV18FluxV20": "ms",
+        "retentionPolicyV18Flux": "",
+        "org": "trigal",
+        "bucket": "estacion",
+        "x": 640,
+        "y": 100,
+        "wires": []
+    },
+    {
+        "id": "tv_d_ind",
+        "type": "debug",
+        "z": "tab_trigal_v2",
+        "name": "Ver índices",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 620,
+        "y": 140,
+        "wires": []
+    },
+    {
+        "id": "tv_esp",
+        "type": "mqtt in",
+        "z": "tab_trigal_v2",
+        "name": "Respuestas ESP",
+        "topic": "trigal/estacion1/esp",
+        "qos": "1",
+        "datatype": "auto-detect",
+        "broker": "b_mosq_local",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 140,
+        "y": 200,
+        "wires": [
+            [
+                "tv_d_esp"
+            ]
+        ]
+    },
+    {
+        "id": "tv_d_esp",
+        "type": "debug",
+        "z": "tab_trigal_v2",
+        "name": "Ver respuestas ESP",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 390,
+        "y": 200,
+        "wires": []
+    },
+    {
+        "id": "tv_c2",
+        "type": "comment",
+        "z": "tab_trigal_v2",
+        "name": "Órdenes para los LEDs",
+        "info": "",
+        "x": 150,
+        "y": 270,
+        "wires": []
+    },
+    {
+        "id": "tv_i1",
+        "type": "inject",
+        "z": "tab_trigal_v2",
+        "name": "Blanco",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "{\"cmd\":\"blanco\"}",
+        "payloadType": "json",
+        "x": 110,
+        "y": 310,
+        "wires": [
+            [
+                "tv_cmd"
+            ]
+        ]
+    },
+    {
+        "id": "tv_i2",
+        "type": "inject",
+        "z": "tab_trigal_v2",
+        "name": "UV",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "{\"cmd\":\"uv\"}",
+        "payloadType": "json",
+        "x": 100,
+        "y": 350,
+        "wires": [
+            [
+                "tv_cmd"
+            ]
+        ]
+    },
+    {
+        "id": "tv_i3",
+        "type": "inject",
+        "z": "tab_trigal_v2",
+        "name": "Apagar",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "{\"cmd\":\"apagar\"}",
+        "payloadType": "json",
+        "x": 110,
+        "y": 390,
+        "wires": [
+            [
+                "tv_cmd"
+            ]
+        ]
+    },
+    {
+        "id": "tv_i4",
+        "type": "inject",
+        "z": "tab_trigal_v2",
+        "name": "Blanco 2 min (calibrar)",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "{\"cmd\":\"blanco\",\"seg\":120}",
+        "payloadType": "json",
+        "x": 150,
+        "y": 430,
+        "wires": [
+            [
+                "tv_cmd"
+            ]
+        ]
+    },
+    {
+        "id": "tv_i5",
+        "type": "inject",
+        "z": "tab_trigal_v2",
+        "name": "Ping",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "{\"cmd\":\"ping\"}",
+        "payloadType": "json",
+        "x": 100,
+        "y": 470,
+        "wires": [
+            [
+                "tv_cmd"
+            ]
+        ]
+    },
+    {
+        "id": "tv_cmd",
+        "type": "mqtt out",
+        "z": "tab_trigal_v2",
+        "name": "Órdenes a la ESP",
+        "topic": "trigal/estacion1/cmd",
+        "qos": "1",
+        "retain": "false",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "b_mosq_local",
+        "x": 430,
+        "y": 390,
+        "wires": []
+    },
+    {
+        "id": "tv_c3",
+        "type": "comment",
+        "z": "tab_trigal_v2",
+        "name": "Prueba de índices (NO guarda en InfluxDB)",
+        "info": "",
+        "x": 220,
+        "y": 540,
+        "wires": []
+    },
+    {
+        "id": "tv_p1",
+        "type": "inject",
+        "z": "tab_trigal_v2",
+        "name": "Simular 20 °C 80 %",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "{\"temperatura\":20,\"humedad\":80}",
+        "payloadType": "json",
+        "x": 150,
+        "y": 580,
+        "wires": [
+            [
+                "tv_pfn"
+            ]
+        ]
+    },
+    {
+        "id": "tv_p2",
+        "type": "inject",
+        "z": "tab_trigal_v2",
+        "name": "Simular madrugada 15 °C 95 %",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "{\"temperatura\":15,\"humedad\":95}",
+        "payloadType": "json",
+        "x": 180,
+        "y": 620,
+        "wires": [
+            [
+                "tv_pfn"
+            ]
+        ]
+    },
+    {
+        "id": "tv_p3",
+        "type": "inject",
+        "z": "tab_trigal_v2",
+        "name": "Simular sin SCD30",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "{\"co2\":0,\"temp_caja\":25}",
+        "payloadType": "json",
+        "x": 140,
+        "y": 660,
+        "wires": [
+            [
+                "tv_pfn"
+            ]
+        ]
+    },
+    {
+        "id": "tv_pfn",
+        "type": "function",
+        "z": "tab_trigal_v2",
+        "name": "Prueba índices",
+        "func": "const d = msg.payload;\nconst T = d.temperatura;\nconst HR = d.humedad;\n\nif (typeof T === \"number\" && typeof HR === \"number\" && HR > 0 && HR <= 100) {\n    const es = 0.6108 * Math.exp(17.27 * T / (T + 237.3));\n    d.dpv = +(es * (1 - HR / 100)).toFixed(3);\n    const g = Math.log(HR / 100) + 17.27 * T / (237.3 + T);\n    d.punto_rocio = +(237.3 * g / (17.27 - g)).toFixed(2);\n    d.margen_rocio = +(T - d.punto_rocio).toFixed(2);\n}\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 440,
+        "y": 620,
+        "wires": [
+            [
+                "tv_d_p"
+            ]
+        ]
+    },
+    {
+        "id": "tv_d_p",
+        "type": "debug",
+        "z": "tab_trigal_v2",
+        "name": "Ver prueba",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 630,
+        "y": 620,
+        "wires": []
+    },
+    {
+        "id": "cc1",
+        "type": "comment",
+        "z": "tab_ciclos",
+        "name": "Formulario de ciclos: http://<ip-de-la-pi>:1880/ciclo",
+        "info": "",
+        "x": 160,
+        "y": 40,
+        "wires": []
+    },
+    {
+        "id": "cg_in",
+        "type": "http in",
+        "z": "tab_ciclos",
+        "name": "GET /ciclo",
+        "url": "/ciclo",
+        "method": "get",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 120,
+        "y": 100,
+        "wires": [
+            [
+                "cg_tpl"
+            ]
+        ]
+    },
+    {
+        "id": "cg_tpl",
+        "type": "template",
+        "z": "tab_ciclos",
+        "name": "Página",
+        "field": "payload",
+        "fieldType": "msg",
+        "format": "html",
+        "syntax": "plain",
+        "template": "<!DOCTYPE html>\n<html lang=\"es\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>Ciclo del cultivo – Estación Trigal</title>\n<style>\n  body { font-family: system-ui, sans-serif; background: #111217; color: #d8d9da; margin: 0; padding: 16px; font-size: 15px; }\n  h1 { font-size: 20px; margin: 0 0 12px; }\n  h2 { font-size: 16px; margin: 0 0 10px; }\n  .caja { background: #181b1f; border: 1px solid #2c3235; border-radius: 6px; padding: 14px; margin-bottom: 14px; max-width: 640px; }\n  .aviso { border-color: #ff9830; background: #2b2216; }\n  .oculto { display: none; }\n  label { display: block; margin: 8px 0 3px; color: #a0a4ab; font-size: 13px; }\n  input { background: #0b0c0e; color: #d8d9da; border: 1px solid #3b4046; border-radius: 4px; padding: 7px; width: 100%; box-sizing: border-box; font-size: 15px; }\n  button { margin: 12px 8px 0 0; padding: 8px 14px; border: 0; border-radius: 4px; font-size: 14px; cursor: pointer; background: #3d71d9; color: #fff; }\n  button.sec { background: #2c3235; }\n  button.peligro { background: #c4162a; }\n  table { border-collapse: collapse; width: 100%; font-size: 13px; }\n  td, th { border-bottom: 1px solid #2c3235; padding: 5px; text-align: left; }\n  #mensaje { max-width: 640px; margin-bottom: 14px; }\n  .ok { color: #73bf69; } .mal { color: #f2495c; }\n</style>\n</head>\n<body>\n<h1>Ciclo del cultivo</h1>\n<div id=\"mensaje\"></div>\n\n<div id=\"cajaAviso\" class=\"caja aviso oculto\">\n  <h2>Revisar lote</h2>\n  <p id=\"textoAviso\"></p>\n  <button onclick=\"mismoLote()\">Sí, sigue en el mismo lote</button>\n  <button class=\"sec\" onclick=\"document.getElementById('lote').focus()\">No, es un lote nuevo</button>\n</div>\n\n<div class=\"caja\">\n  <h2>Ciclo actual</h2>\n  <div id=\"actual\">Cargando…</div>\n  <div id=\"botonesActual\" class=\"oculto\">\n    <button class=\"sec\" onclick=\"modoEditar()\">Corregir datos</button>\n    <button class=\"peligro\" onclick=\"terminar()\">Terminar ciclo</button>\n  </div>\n</div>\n\n<div class=\"caja\">\n  <h2 id=\"tituloForm\">Iniciar ciclo nuevo</h2>\n  <label for=\"lote\">Código del lote</label>\n  <input id=\"lote\" inputmode=\"numeric\" placeholder=\"Ej. 1234\">\n  <label for=\"ubicacion\">Ubicación (bloque, nave, cama…)</label>\n  <input id=\"ubicacion\" maxlength=\"80\" placeholder=\"Ej. Bloque 3, nave 2\">\n  <label for=\"inicio\">Fecha de inicio (siembra o trasplante)</label>\n  <input id=\"inicio\" type=\"date\">\n  <label for=\"tbase\">T-base (°C)</label>\n  <input id=\"tbase\" type=\"number\" step=\"0.5\" min=\"0\" max=\"20\" value=\"5\">\n  <button id=\"btnGuardar\" onclick=\"guardar()\">Iniciar ciclo nuevo</button>\n  <button id=\"btnCancelar\" class=\"sec oculto\" onclick=\"modoNuevo()\">Cancelar</button>\n</div>\n\n<div class=\"caja\">\n  <h2>Ciclos registrados</h2>\n  <div id=\"lista\"></div>\n</div>\n\n<script>\nlet estado = null;\nlet editando = false;\nconst $ = id => document.getElementById(id);\nconst hoy = () => new Date(Date.now() - 5 * 3600000).toISOString().slice(0, 10);\n\nfunction mostrar(texto, bien) {\n  $(\"mensaje\").innerHTML = '<span class=\"' + (bien ? \"ok\" : \"mal\") + '\"></span>';\n  $(\"mensaje\").firstChild.textContent = texto;\n}\n\nfunction celda(fila, texto) { const td = document.createElement(\"td\"); td.textContent = texto; fila.appendChild(td); }\n\nasync function cargar() {\n  try {\n    const r = await fetch(\"ciclo/estado\");\n    estado = await r.json();\n  } catch (e) { $(\"actual\").textContent = \"Sin datos.\"; mostrar(\"No se pudo leer el estado: \" + e, false); return; }\n  if (estado.ok === false) { $(\"actual\").textContent = \"Sin datos.\"; mostrar(estado.error, false); return; }\n\n  const a = estado.activo;\n  $(\"actual\").textContent = a\n    ? \"Lote \" + a.lote + (a.ubicacion ? \" · \" + a.ubicacion : \"\") + \" · desde el \" + a.inicio + \" · T-base \" + a.tbase + \" °C\"\n    : \"No hay ciclo activo.\";\n  $(\"botonesActual\").classList.toggle(\"oculto\", !a);\n\n  $(\"cajaAviso\").classList.toggle(\"oculto\", !estado.aviso);\n  $(\"textoAviso\").textContent = estado.aviso || \"\";\n\n  const lista = $(\"lista\");\n  lista.innerHTML = \"\";\n  if (!estado.ciclos.length) { lista.textContent = \"Todavía no hay ciclos.\"; return; }\n  const t = document.createElement(\"table\");\n  const cab = document.createElement(\"tr\");\n  [\"Lote\", \"Ubicación\", \"Inicio\", \"Fin\", \"T-base\"].forEach(h => { const th = document.createElement(\"th\"); th.textContent = h; cab.appendChild(th); });\n  t.appendChild(cab);\n  estado.ciclos.forEach(c => {\n    const f = document.createElement(\"tr\");\n    [c.lote, c.ubicacion, c.inicio, c.fin || \"en curso\", c.tbase + \" °C\"].forEach(v => celda(f, v));\n    t.appendChild(f);\n  });\n  lista.appendChild(t);\n}\n\nasync function enviar(datos) {\n  try {\n    const r = await fetch(\"ciclo\", {method: \"POST\", headers: {\"Content-Type\": \"application/json\"}, body: JSON.stringify(datos)});\n    const res = await r.json();\n    mostrar(res.ok ? res.mensaje : res.error, res.ok);\n    if (res.ok) { modoNuevo(); await cargar(); }\n  } catch (e) { mostrar(\"No se pudo enviar: \" + e, false); }\n}\n\nfunction leerFormulario() {\n  return {lote: $(\"lote\").value.trim(), ubicacion: $(\"ubicacion\").value.trim(), inicio: $(\"inicio\").value, tbase: parseFloat($(\"tbase\").value)};\n}\n\nfunction guardar() {\n  const d = leerFormulario();\n  if (!/^\\d+$/.test(d.lote)) { mostrar(\"El código del lote debe ser numérico.\", false); return; }\n  if (!d.inicio) { mostrar(\"Falta la fecha de inicio.\", false); return; }\n  const a = estado && estado.activo;\n  let texto;\n  if (editando) {\n    texto = \"Se van a corregir los datos del ciclo actual:\\n\\nLote \" + d.lote + \" · \" + (d.ubicacion || \"sin ubicación\") +\n            \"\\nDesde el \" + d.inicio + \" · T-base \" + d.tbase + \" °C\\n\\n¿Confirmar?\";\n  } else {\n    texto = (a ? \"Se cerrará el ciclo del lote \" + a.lote + \" (desde el \" + a.inicio + \").\\n\\n\" : \"\") +\n            \"Empieza el ciclo del lote \" + d.lote + \" · \" + (d.ubicacion || \"sin ubicación\") +\n            \"\\nDesde el \" + d.inicio + \" · T-base \" + d.tbase + \" °C\\n\\n¿Confirmar?\";\n  }\n  if (!confirm(texto)) return;\n  d.accion = editando ? \"editar\" : \"nuevo\";\n  enviar(d);\n}\n\nfunction terminar() {\n  const a = estado.activo;\n  const fin = prompt(\"Fecha de fin del ciclo del lote \" + a.lote + \" (AAAA-MM-DD):\", hoy());\n  if (!fin) return;\n  if (!confirm(\"Se terminará el ciclo del lote \" + a.lote + \" el \" + fin + \". ¿Confirmar?\")) return;\n  enviar({accion: \"terminar\", fin: fin});\n}\n\nfunction mismoLote() {\n  if (!confirm(\"Confirmar que la estación sigue en el lote \" + (estado.activo ? estado.activo.lote : \"\") + \".\")) return;\n  enviar({accion: \"mismo_lote\"});\n}\n\nfunction modoEditar() {\n  const a = estado.activo;\n  editando = true;\n  $(\"lote\").value = a.lote; $(\"ubicacion\").value = a.ubicacion; $(\"inicio\").value = a.inicio; $(\"tbase\").value = a.tbase;\n  $(\"tituloForm\").textContent = \"Corregir ciclo actual\";\n  $(\"btnGuardar\").textContent = \"Guardar corrección\";\n  $(\"btnCancelar\").classList.remove(\"oculto\");\n}\n\nfunction modoNuevo() {\n  editando = false;\n  $(\"lote\").value = \"\"; $(\"ubicacion\").value = \"\"; $(\"inicio\").value = hoy(); $(\"tbase\").value = 5;\n  $(\"tituloForm\").textContent = \"Iniciar ciclo nuevo\";\n  $(\"btnGuardar\").textContent = \"Iniciar ciclo nuevo\";\n  $(\"btnCancelar\").classList.add(\"oculto\");\n}\n\n$(\"inicio\").max = hoy();\nmodoNuevo();\ncargar();\n</script>\n</body>\n</html>\n",
+        "output": "str",
+        "x": 320,
+        "y": 100,
+        "wires": [
+            [
+                "cg_res"
+            ]
+        ]
+    },
+    {
+        "id": "cg_res",
+        "type": "http response",
+        "z": "tab_ciclos",
+        "name": "",
+        "statusCode": "",
+        "headers": {},
+        "x": 500,
+        "y": 100,
+        "wires": []
+    },
+    {
+        "id": "ce_in",
+        "type": "http in",
+        "z": "tab_ciclos",
+        "name": "GET /ciclo/estado",
+        "url": "/ciclo/estado",
+        "method": "get",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 140,
+        "y": 160,
+        "wires": [
+            [
+                "ce_q"
+            ]
+        ]
+    },
+    {
+        "id": "ce_q",
+        "type": "function",
+        "z": "tab_ciclos",
+        "name": "Consulta de ciclos",
+        "func": "msg.pedido = msg.payload;\nmsg.query = \"from(bucket: \\\"estacion\\\")\\n  |> range(start: 2020-01-01T00:00:00Z)\\n  |> filter(fn: (r) => r._measurement == \\\"ciclos\\\" or r._measurement == \\\"estado_estacion\\\")\\n  |> last()\\n  |> pivot(rowKey: [\\\"_time\\\"], columnKey: [\\\"_field\\\"], valueColumn: \\\"_value\\\")\";\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 360,
+        "y": 160,
+        "wires": [
+            [
+                "ce_db"
+            ]
+        ]
+    },
+    {
+        "id": "ce_db",
+        "type": "influxdb in",
+        "z": "tab_ciclos",
+        "influxdb": "c_influx_local",
+        "name": "Leer InfluxDB",
+        "query": "",
+        "rawOutput": false,
+        "precision": "",
+        "retentionPolicy": "",
+        "org": "trigal",
+        "x": 560,
+        "y": 160,
+        "wires": [
+            [
+                "ce_fn"
+            ]
+        ]
+    },
+    {
+        "id": "ce_fn",
+        "type": "function",
+        "z": "tab_ciclos",
+        "name": "Armar estado",
+        "func": "const filas = msg.payload || [];\nconst ciclos = filas\n    .filter(r => r._measurement === \"ciclos\" && r.estado !== \"anulado\")\n    .map(r => ({ciclo: r.ciclo, lote: r.lote, ubicacion: r.ubicacion, inicio: r.inicio, fin: r.fin, tbase: r.tbase, estado: r.estado}))\n    .sort((a, b) => b.inicio.localeCompare(a.inicio));\nconst aviso = filas.find(r => r._measurement === \"estado_estacion\" && r.revisar_lote === 1);\n\nmsg.payload = {\n    activo: ciclos.find(c => c.estado === \"activo\") || null,\n    ciclos: ciclos,\n    aviso: aviso ? aviso.mensaje : \"\"\n};\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 740,
+        "y": 160,
+        "wires": [
+            [
+                "ce_res"
+            ]
+        ]
+    },
+    {
+        "id": "ce_res",
+        "type": "http response",
+        "z": "tab_ciclos",
+        "name": "",
+        "statusCode": "",
+        "headers": {},
+        "x": 910,
+        "y": 160,
+        "wires": []
+    },
+    {
+        "id": "cp_in",
+        "type": "http in",
+        "z": "tab_ciclos",
+        "name": "POST /ciclo",
+        "url": "/ciclo",
+        "method": "post",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 130,
+        "y": 240,
+        "wires": [
+            [
+                "cp_q"
+            ]
+        ]
+    },
+    {
+        "id": "cp_q",
+        "type": "function",
+        "z": "tab_ciclos",
+        "name": "Consulta de ciclos",
+        "func": "msg.pedido = msg.payload;\nmsg.query = \"from(bucket: \\\"estacion\\\")\\n  |> range(start: 2020-01-01T00:00:00Z)\\n  |> filter(fn: (r) => r._measurement == \\\"ciclos\\\" or r._measurement == \\\"estado_estacion\\\")\\n  |> last()\\n  |> pivot(rowKey: [\\\"_time\\\"], columnKey: [\\\"_field\\\"], valueColumn: \\\"_value\\\")\";\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 340,
+        "y": 240,
+        "wires": [
+            [
+                "cp_db"
+            ]
+        ]
+    },
+    {
+        "id": "cp_db",
+        "type": "influxdb in",
+        "z": "tab_ciclos",
+        "influxdb": "c_influx_local",
+        "name": "Leer InfluxDB",
+        "query": "",
+        "rawOutput": false,
+        "precision": "",
+        "retentionPolicy": "",
+        "org": "trigal",
+        "x": 540,
+        "y": 240,
+        "wires": [
+            [
+                "cp_fn"
+            ]
+        ]
+    },
+    {
+        "id": "cp_fn",
+        "type": "function",
+        "z": "tab_ciclos",
+        "name": "Decidir cambios",
+        "func": "// Recibe lo que mandó el formulario (msg.pedido) y los ciclos guardados (msg.payload)\nconst p = msg.pedido || {};\nconst filas = msg.payload || [];\nconst ciclos = filas.filter(r => r._measurement === \"ciclos\" && r.estado !== \"anulado\");\nconst activo = ciclos.find(r => r.estado === \"activo\");\nconst puntos = [];\n\nconst hoy = new Date(Date.now() - 5 * 3600000).toISOString().slice(0, 10);\nfunction diaAnterior(f) {\n    const d = new Date(f + \"T12:00:00Z\");\n    d.setUTCDate(d.getUTCDate() - 1);\n    return d.toISOString().slice(0, 10);\n}\nfunction error(texto) {\n    msg.statusCode = 400;\n    msg.payload = {ok: false, error: texto};\n    return [null, msg];\n}\nfunction escribir(ciclo, campos) {\n    puntos.push({measurement: \"ciclos\", tags: {ciclo: ciclo}, fields: campos});\n}\nfunction validar(d) {\n    if (!/^\\d+$/.test(d.lote || \"\")) return \"El código del lote debe ser numérico.\";\n    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(d.inicio || \"\")) return \"La fecha de inicio no es válida.\";\n    if (d.inicio > hoy) return \"La fecha de inicio no puede ser futura.\";\n    if (typeof d.tbase !== \"number\" || isNaN(d.tbase) || d.tbase < 0 || d.tbase > 20) return \"La T-base debe estar entre 0 y 20 °C.\";\n    return \"\";\n}\n\nconst nuevo = {\n    lote: String(p.lote || \"\").trim(),\n    ubicacion: String(p.ubicacion || \"\").trim().slice(0, 80),\n    inicio: p.inicio,\n    tbase: Number(p.tbase)\n};\n\nif (p.accion === \"nuevo\") {\n    const e = validar(nuevo);\n    if (e) return error(e);\n    const id = nuevo.lote + \"_\" + nuevo.inicio;\n    if (ciclos.some(c => c.ciclo === id)) return error(\"Ya existe un ciclo del lote \" + nuevo.lote + \" con esa fecha de inicio.\");\n    if (activo) {\n        if (nuevo.inicio <= activo.inicio) return error(\"El ciclo nuevo debe empezar después del \" + activo.inicio + \", que es cuando empezó el actual.\");\n        escribir(activo.ciclo, {lote: activo.lote, ubicacion: activo.ubicacion, inicio: activo.inicio, fin: diaAnterior(nuevo.inicio), tbase: activo.tbase, estado: \"cerrado\"});\n    }\n    escribir(id, Object.assign({}, nuevo, {fin: \"\", estado: \"activo\"}));\n    msg.resumen = \"Ciclo del lote \" + nuevo.lote + \" iniciado desde el \" + nuevo.inicio + \".\";\n}\nelse if (p.accion === \"editar\") {\n    if (!activo) return error(\"No hay un ciclo activo para corregir.\");\n    const e = validar(nuevo);\n    if (e) return error(e);\n    if (nuevo.inicio === activo.inicio && nuevo.lote === activo.lote) {\n        escribir(activo.ciclo, Object.assign({}, nuevo, {fin: \"\", estado: \"activo\"}));\n    } else {\n        const id = nuevo.lote + \"_\" + nuevo.inicio;\n        const anterior = ciclos.find(c => c.estado === \"cerrado\" && c.fin === diaAnterior(activo.inicio));\n        if (anterior && nuevo.inicio <= anterior.inicio) return error(\"La fecha debe ser posterior al \" + anterior.inicio + \", inicio del ciclo anterior.\");\n        escribir(activo.ciclo, {lote: activo.lote, ubicacion: activo.ubicacion, inicio: activo.inicio, fin: activo.fin, tbase: activo.tbase, estado: \"anulado\"});\n        escribir(id, Object.assign({}, nuevo, {fin: \"\", estado: \"activo\"}));\n        if (anterior) escribir(anterior.ciclo, {lote: anterior.lote, ubicacion: anterior.ubicacion, inicio: anterior.inicio, fin: diaAnterior(nuevo.inicio), tbase: anterior.tbase, estado: \"cerrado\"});\n    }\n    msg.resumen = \"Ciclo actual corregido.\";\n}\nelse if (p.accion === \"terminar\") {\n    if (!activo) return error(\"No hay un ciclo activo para terminar.\");\n    const fin = p.fin || hoy;\n    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(fin) || fin < activo.inicio || fin > hoy) return error(\"La fecha de fin debe estar entre \" + activo.inicio + \" y hoy.\");\n    escribir(activo.ciclo, {lote: activo.lote, ubicacion: activo.ubicacion, inicio: activo.inicio, fin: fin, tbase: activo.tbase, estado: \"cerrado\"});\n    msg.resumen = \"Ciclo del lote \" + activo.lote + \" terminado el \" + fin + \".\";\n}\nelse if (p.accion === \"mismo_lote\") {\n    msg.resumen = \"Confirmado: la estación sigue en el mismo lote.\";\n}\nelse {\n    return error(\"Acción desconocida.\");\n}\n\n// Cualquier decisión quita el aviso de \"revisar lote\"\npuntos.push({measurement: \"estado_estacion\", fields: {revisar_lote: 0, mensaje: \"\"}});\nmsg.payload = puntos;\nreturn [msg, null];",
+        "outputs": 2,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 720,
+        "y": 240,
+        "wires": [
+            [
+                "cp_batch"
+            ],
+            [
+                "cp_res"
+            ]
+        ]
+    },
+    {
+        "id": "cp_batch",
+        "type": "influxdb batch",
+        "z": "tab_ciclos",
+        "influxdb": "c_influx_local",
+        "precision": "",
+        "retentionPolicy": "",
+        "name": "Guardar ciclo",
+        "database": "database",
+        "precisionV18FluxV20": "ms",
+        "retentionPolicyV18Flux": "",
+        "org": "trigal",
+        "bucket": "estacion",
+        "x": 940,
+        "y": 220,
+        "wires": []
+    },
+    {
+        "id": "cp_ok_c",
+        "type": "complete",
+        "z": "tab_ciclos",
+        "name": "Guardado",
+        "scope": [
+            "cp_batch"
+        ],
+        "uncaught": false,
+        "x": 720,
+        "y": 300,
+        "wires": [
+            [
+                "cp_ok"
+            ]
+        ]
+    },
+    {
+        "id": "cp_ok",
+        "type": "function",
+        "z": "tab_ciclos",
+        "name": "Respuesta OK",
+        "func": "msg.statusCode = 200;\nmsg.payload = {ok: true, mensaje: msg.resumen};\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 900,
+        "y": 300,
+        "wires": [
+            [
+                "cp_res"
+            ]
+        ]
+    },
+    {
+        "id": "cp_err_c",
+        "type": "catch",
+        "z": "tab_ciclos",
+        "name": "Error al guardar",
+        "scope": [
+            "cp_batch"
+        ],
+        "uncaught": false,
+        "x": 720,
+        "y": 340,
+        "wires": [
+            [
+                "cp_err"
+            ]
+        ]
+    },
+    {
+        "id": "cp_err",
+        "type": "function",
+        "z": "tab_ciclos",
+        "name": "Respuesta error",
+        "func": "msg.statusCode = 500;\nmsg.payload = {ok: false, error: \"No se pudo guardar en InfluxDB: \" + (msg.error ? msg.error.message : \"\")};\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 910,
+        "y": 340,
+        "wires": [
+            [
+                "cp_res"
+            ]
+        ]
+    },
+    {
+        "id": "cp_res",
+        "type": "http response",
+        "z": "tab_ciclos",
+        "name": "",
+        "statusCode": "",
+        "headers": {},
+        "x": 1110,
+        "y": 280,
+        "wires": []
+    },
+    {
+        "id": "cl_catch",
+        "type": "catch",
+        "z": "tab_ciclos",
+        "name": "Error al leer",
+        "scope": [
+            "ce_db",
+            "cp_db"
+        ],
+        "uncaught": false,
+        "x": 540,
+        "y": 390,
+        "wires": [
+            [
+                "cl_err"
+            ]
+        ]
+    },
+    {
+        "id": "cl_err",
+        "type": "function",
+        "z": "tab_ciclos",
+        "name": "Respuesta error",
+        "func": "msg.statusCode = 500;\nmsg.payload = {ok: false, error: \"No se pudo leer InfluxDB: \" + (msg.error ? msg.error.message : \"\")};\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 740,
+        "y": 390,
+        "wires": [
+            [
+                "ce_res"
+            ]
+        ]
+    },
+    {
+        "id": "cc2",
+        "type": "comment",
+        "z": "tab_ciclos",
+        "name": "Aviso cuando la estación pasa más de 6 h sin datos",
+        "info": "",
+        "x": 190,
+        "y": 460,
+        "wires": []
+    },
+    {
+        "id": "ca_inj",
+        "type": "inject",
+        "z": "tab_ciclos",
+        "name": "Al arrancar",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": true,
+        "onceDelay": "3",
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 140,
+        "y": 510,
+        "wires": [
+            [
+                "ca_q"
+            ]
+        ]
+    },
+    {
+        "id": "ca_q",
+        "type": "function",
+        "z": "tab_ciclos",
+        "name": "Última lectura guardada",
+        "func": "// Última lectura guardada antes de que arrancara Node-RED\nconst hasta = new Date(Date.now() - 30000).toISOString();\nmsg.topic = \"arranque\";\nmsg.query = 'from(bucket: \"estacion\") |> range(start: -400d, stop: ' + hasta + ') ' +\n    '|> filter(fn: (r) => r._measurement == \"datos\") |> group() |> last() |> keep(columns: [\"_time\"])';\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 350,
+        "y": 510,
+        "wires": [
+            [
+                "ca_db"
+            ]
+        ]
+    },
+    {
+        "id": "ca_db",
+        "type": "influxdb in",
+        "z": "tab_ciclos",
+        "influxdb": "c_influx_local",
+        "name": "Leer InfluxDB",
+        "query": "",
+        "rawOutput": false,
+        "precision": "",
+        "retentionPolicy": "",
+        "org": "trigal",
+        "x": 560,
+        "y": 510,
+        "wires": [
+            [
+                "ca_fn"
+            ]
+        ]
+    },
+    {
+        "id": "ca_mqtt",
+        "type": "mqtt in",
+        "z": "tab_ciclos",
+        "name": "Datos estación",
+        "topic": "trigal/estacion1/datos",
+        "qos": "1",
+        "datatype": "json",
+        "broker": "b_mosq_local",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 140,
+        "y": 570,
+        "wires": [
+            [
+                "ca_fn"
+            ]
+        ]
+    },
+    {
+        "id": "ca_fn",
+        "type": "function",
+        "z": "tab_ciclos",
+        "name": "Revisar apagado",
+        "func": "// Si la estación pasa más de HORAS sin mandar datos (apagada o movida),\n// deja un aviso para que alguien confirme si sigue en el mismo lote.\nconst HORAS = 6;\n\nfunction revisar(t) {\n    const ultimo = context.get(\"ultimo\");\n    context.set(\"ultimo\", t);\n    if (!ultimo || t - ultimo < HORAS * 3600000) return null;\n    const f = x => new Date(x - 5 * 3600000).toISOString().slice(0, 16).replace(\"T\", \" \");\n    const horas = ((t - ultimo) / 3600000).toFixed(1);\n    msg.payload = [{measurement: \"estado_estacion\", fields: {\n        revisar_lote: 1,\n        mensaje: \"La estación estuvo sin datos desde \" + f(ultimo) + \" hasta \" + f(t) + \" (\" + horas + \" h). ¿Sigue en el mismo lote?\"\n    }}];\n    return msg;\n}\n\nif (msg.topic === \"arranque\") {\n    const fila = (msg.payload || [])[0];\n    if (fila && !context.get(\"ultimo\")) context.set(\"ultimo\", new Date(fila._time).getTime());\n    context.set(\"listo\", true);\n    const pendiente = context.get(\"pendiente\");\n    context.set(\"pendiente\", null);\n    return pendiente ? revisar(pendiente) : null;\n}\n\nif (!context.get(\"listo\")) {\n    if (!context.get(\"pendiente\")) context.set(\"pendiente\", Date.now());\n    return null;\n}\nreturn revisar(Date.now());",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 760,
+        "y": 540,
+        "wires": [
+            [
+                "ca_batch"
+            ]
+        ]
+    },
+    {
+        "id": "ca_batch",
+        "type": "influxdb batch",
+        "z": "tab_ciclos",
+        "influxdb": "c_influx_local",
+        "precision": "",
+        "retentionPolicy": "",
+        "name": "Guardar aviso",
+        "database": "database",
+        "precisionV18FluxV20": "ms",
+        "retentionPolicyV18Flux": "",
+        "org": "trigal",
+        "bucket": "estacion",
+        "x": 970,
+        "y": 540,
+        "wires": []
+    },
+    {
+        "id": "dc1",
+        "type": "comment",
+        "z": "tab_descargas",
+        "name": "Consulta y descarga: http://<ip-de-la-pi>:1880/descarga",
+        "info": "",
+        "x": 170,
+        "y": 40,
+        "wires": []
+    },
+    {
+        "id": "dp_in",
+        "type": "http in",
+        "z": "tab_descargas",
+        "name": "GET /descarga",
+        "url": "/descarga",
+        "method": "get",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 130,
+        "y": 100,
+        "wires": [
+            [
+                "dp_tpl"
+            ]
+        ]
+    },
+    {
+        "id": "dp_tpl",
+        "type": "template",
+        "z": "tab_descargas",
+        "name": "Página",
+        "field": "payload",
+        "fieldType": "msg",
+        "format": "html",
+        "syntax": "plain",
+        "template": "<!DOCTYPE html>\n<html lang=\"es\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>Consulta y descarga – Estación Trigal</title>\n<style>\n  body { font-family: system-ui, sans-serif; background: #111217; color: #d8d9da; margin: 0; padding: 16px; font-size: 15px; }\n  h1 { font-size: 20px; margin: 0 0 12px; }\n  h2 { font-size: 16px; margin: 0 0 10px; }\n  .caja { background: #181b1f; border: 1px solid #2c3235; border-radius: 6px; padding: 14px; margin-bottom: 14px; max-width: 900px; }\n  label { color: #a0a4ab; font-size: 13px; }\n  .campo { display: inline-block; margin: 0 16px 10px 0; vertical-align: top; }\n  .campo > label { display: block; margin-bottom: 3px; }\n  input, select { background: #0b0c0e; color: #d8d9da; border: 1px solid #3b4046; border-radius: 4px; padding: 6px; font-size: 14px; }\n  .opciones label { color: #d8d9da; font-size: 14px; display: inline-block; margin: 3px 14px 3px 0; }\n  button { margin: 6px 8px 0 0; padding: 8px 14px; border: 0; border-radius: 4px; font-size: 14px; cursor: pointer; background: #3d71d9; color: #fff; }\n  button.sec { background: #2c3235; }\n  .oculto { display: none; }\n  .tabla { overflow-x: auto; }\n  table { border-collapse: collapse; font-size: 12px; }\n  td, th { border-bottom: 1px solid #2c3235; padding: 4px 8px; text-align: right; white-space: nowrap; }\n  th { color: #a0a4ab; }\n  code { background: #0b0c0e; padding: 6px; display: block; word-break: break-all; font-size: 12px; border-radius: 4px; }\n  .mal { color: #f2495c; } .nota { color: #8e9297; font-size: 13px; }\n</style>\n</head>\n<body>\n<h1>Consulta y descarga de datos</h1>\n\n<div class=\"caja\">\n  <h2>1. Qué datos</h2>\n  <div class=\"opciones\">\n    <label><input type=\"radio\" name=\"tipo\" value=\"lecturas\" checked> Lecturas de los sensores</label>\n    <label><input type=\"radio\" name=\"tipo\" value=\"diario\"> Resumen diario (GDD, DLI, fotoperiodo)</label>\n  </div>\n</div>\n\n<div class=\"caja\">\n  <h2>2. Cuándo</h2>\n  <div class=\"campo\"><label for=\"ciclo\">Ciclo / lote</label>\n    <select id=\"ciclo\"><option value=\"\">— Usar rango de fechas —</option></select></div>\n  <div class=\"campo\"><label for=\"desde\">Desde</label><input id=\"desde\" type=\"date\"></div>\n  <div class=\"campo\"><label for=\"hasta\">Hasta</label><input id=\"hasta\" type=\"date\"></div>\n  <div id=\"cajaHorario\" class=\"campo\"><label>Horario (hora local)</label>\n    <select id=\"hora_desde\"></select> a <select id=\"hora_hasta\"></select></div>\n</div>\n\n<div class=\"caja\" id=\"cajaVariables\">\n  <h2>3. Variables</h2>\n  <div class=\"opciones\" id=\"campos\">Cargando…</div>\n  <button class=\"sec\" onclick=\"marcar(true)\">Todas</button>\n  <button class=\"sec\" onclick=\"marcar(false)\">Ninguna</button>\n  <div class=\"campo\" style=\"margin-top:12px\"><label for=\"intervalo\">Cada cuánto (promedio)</label>\n    <select id=\"intervalo\">\n      <option value=\"0\">Sin agrupar (cada 5 s)</option>\n      <option value=\"1m\">1 minuto</option>\n      <option value=\"5m\">5 minutos</option>\n      <option value=\"15m\" selected>15 minutos</option>\n      <option value=\"1h\">1 hora</option>\n      <option value=\"1d\">1 día</option>\n    </select></div>\n</div>\n\n<div class=\"caja\">\n  <h2>4. Formato</h2>\n  <div class=\"opciones\">\n    <label><input type=\"radio\" name=\"formato\" value=\"excel\" checked> Excel (separador ; y coma decimal)</label>\n    <label><input type=\"radio\" name=\"formato\" value=\"codigo\"> R / Python (separador , y punto decimal)</label>\n  </div>\n  <button onclick=\"consultar()\">Consultar</button>\n  <button onclick=\"descargar()\">Descargar CSV</button>\n  <p id=\"mensaje\"></p>\n</div>\n\n<div class=\"caja oculto\" id=\"cajaVista\">\n  <h2>Vista previa (primeras filas)</h2>\n  <div class=\"tabla\" id=\"vista\"></div>\n</div>\n\n<div class=\"caja\">\n  <h2>Enlace para R o Python</h2>\n  <p class=\"nota\">Este enlace descarga el mismo archivo con los criterios elegidos. Se actualiza al cambiar las opciones.</p>\n  <code id=\"enlace\"></code>\n</div>\n\n<script>\nconst $ = id => document.getElementById(id);\nconst hoy = new Date(Date.now() - 5 * 3600000).toISOString().slice(0, 10);\n\nfunction tipo() { return document.querySelector(\"input[name=tipo]:checked\").value; }\n\nfunction parametros(vista) {\n  const p = new URLSearchParams();\n  p.set(\"tipo\", tipo());\n  if ($(\"ciclo\").value) p.set(\"ciclo\", $(\"ciclo\").value);\n  else { p.set(\"desde\", $(\"desde\").value); p.set(\"hasta\", $(\"hasta\").value); }\n  if (tipo() === \"lecturas\") {\n    const campos = [...document.querySelectorAll(\"#campos input:checked\")].map(c => c.value);\n    p.set(\"campos\", campos.join(\",\"));\n    p.set(\"intervalo\", $(\"intervalo\").value);\n    if ($(\"hora_desde\").value !== \"0\" || $(\"hora_hasta\").value !== \"24\") {\n      p.set(\"hora_desde\", $(\"hora_desde\").value); p.set(\"hora_hasta\", $(\"hora_hasta\").value);\n    }\n  }\n  p.set(\"formato\", document.querySelector(\"input[name=formato]:checked\").value);\n  if (vista) p.set(\"vista\", \"1\");\n  return p.toString();\n}\n\nfunction actualizar() {\n  const esLecturas = tipo() === \"lecturas\";\n  $(\"cajaVariables\").classList.toggle(\"oculto\", !esLecturas);\n  $(\"cajaHorario\").classList.toggle(\"oculto\", !esLecturas);\n  const conCiclo = !!$(\"ciclo\").value;\n  $(\"desde\").disabled = conCiclo; $(\"hasta\").disabled = conCiclo;\n  $(\"enlace\").textContent = new URL(\"descarga/csv?\" + parametros(false), location.href).href;\n}\n\nfunction marcar(v) { document.querySelectorAll(\"#campos input\").forEach(c => c.checked = v); actualizar(); }\n\nfunction aviso(texto) { $(\"mensaje\").className = \"mal\"; $(\"mensaje\").textContent = texto; }\n\nasync function consultar() {\n  $(\"mensaje\").textContent = \"Consultando…\"; $(\"mensaje\").className = \"nota\";\n  try {\n    const r = await fetch(\"descarga/csv?\" + parametros(true));\n    const d = await r.json();\n    if (!d.ok) { aviso(d.error); return; }\n    $(\"mensaje\").textContent = d.mostradas ? \"\" : \"No hay datos con esos criterios.\";\n    const t = document.createElement(\"table\");\n    const cab = document.createElement(\"tr\");\n    d.columnas.forEach(c => { const th = document.createElement(\"th\"); th.textContent = c; cab.appendChild(th); });\n    t.appendChild(cab);\n    d.filas.forEach(f => {\n      const tr = document.createElement(\"tr\");\n      f.forEach(v => { const td = document.createElement(\"td\"); td.textContent = v; tr.appendChild(td); });\n      t.appendChild(tr);\n    });\n    $(\"vista\").innerHTML = \"\"; $(\"vista\").appendChild(t);\n    $(\"cajaVista\").classList.remove(\"oculto\");\n  } catch (e) { aviso(\"No se pudo consultar: \" + e); }\n}\n\nasync function descargar() {\n  $(\"mensaje\").textContent = \"Preparando archivo…\"; $(\"mensaje\").className = \"nota\";\n  try {\n    const r = await fetch(\"descarga/csv?\" + parametros(false));\n    if (!r.ok) { const d = await r.json(); aviso(d.error); return; }\n    const nombre = (r.headers.get(\"Content-Disposition\") || \"\").split('filename=\"')[1] || \"datos.csv\";\n    const blob = await r.blob();\n    const a = document.createElement(\"a\");\n    a.href = URL.createObjectURL(blob); a.download = nombre.replace('\"', \"\"); a.click();\n    $(\"mensaje\").textContent = \"Listo: \" + a.download;\n  } catch (e) { aviso(\"No se pudo descargar: \" + e); }\n}\n\nasync function iniciar() {\n  for (let h = 0; h <= 24; h++) {\n    if (h < 24) $(\"hora_desde\").add(new Option(String(h).padStart(2, \"0\") + \":00\", h));\n    if (h > 0) $(\"hora_hasta\").add(new Option(String(h).padStart(2, \"0\") + \":00\", h));\n  }\n  $(\"hora_hasta\").value = \"24\";\n  $(\"hasta\").value = hoy;\n  $(\"desde\").value = new Date(Date.now() - 5 * 3600000 - 7 * 86400000).toISOString().slice(0, 10);\n  try {\n    const o = await (await fetch(\"descarga/opciones\")).json();\n    if (o.ok === false) { $(\"campos\").textContent = \"Sin datos.\"; aviso(o.error); actualizar(); return; }\n    o.ciclos.forEach(c => $(\"ciclo\").add(new Option(\"Lote \" + c.lote + (c.ubicacion ? \" · \" + c.ubicacion : \"\") +\n      \" (\" + c.inicio + \" a \" + (c.fin || \"hoy\") + \")\", c.ciclo)));\n    $(\"campos\").innerHTML = \"\";\n    o.campos.forEach(f => {\n      const l = document.createElement(\"label\");\n      const i = document.createElement(\"input\");\n      i.type = \"checkbox\"; i.value = f;\n      i.checked = [\"temperatura\", \"humedad\", \"co2\", \"par\", \"dpv\"].includes(f);\n      l.appendChild(i); l.appendChild(document.createTextNode(\" \" + f));\n      $(\"campos\").appendChild(l);\n    });\n    if (!o.campos.length) $(\"campos\").textContent = \"No hay lecturas en los últimos 30 días.\";\n  } catch (e) { aviso(\"No se pudieron cargar las opciones: \" + e); }\n  document.querySelectorAll(\"input, select\").forEach(el => el.addEventListener(\"change\", actualizar));\n  actualizar();\n}\niniciar();\n</script>\n</body>\n</html>\n",
+        "output": "str",
+        "x": 330,
+        "y": 100,
+        "wires": [
+            [
+                "dp_res"
+            ]
+        ]
+    },
+    {
+        "id": "dp_res",
+        "type": "http response",
+        "z": "tab_descargas",
+        "name": "",
+        "statusCode": "",
+        "headers": {},
+        "x": 510,
+        "y": 100,
+        "wires": []
+    },
+    {
+        "id": "do_in",
+        "type": "http in",
+        "z": "tab_descargas",
+        "name": "GET /descarga/opciones",
+        "url": "/descarga/opciones",
+        "method": "get",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 150,
+        "y": 160,
+        "wires": [
+            [
+                "do_f1"
+            ]
+        ]
+    },
+    {
+        "id": "do_f1",
+        "type": "function",
+        "z": "tab_descargas",
+        "name": "Consultar campos",
+        "func": "msg.query = \"from(bucket: \\\"estacion\\\")\\n  |> range(start: -30d)\\n  |> filter(fn: (r) => r._measurement == \\\"datos\\\")\\n  |> last()\\n  |> keep(columns: [\\\"_field\\\", \\\"_value\\\"])\";\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 380,
+        "y": 160,
+        "wires": [
+            [
+                "do_db1"
+            ]
+        ]
+    },
+    {
+        "id": "do_db1",
+        "type": "influxdb in",
+        "z": "tab_descargas",
+        "influxdb": "c_influx_local",
+        "name": "Leer InfluxDB",
+        "query": "",
+        "rawOutput": false,
+        "precision": "",
+        "retentionPolicy": "",
+        "org": "trigal",
+        "x": 570,
+        "y": 160,
+        "wires": [
+            [
+                "do_f2"
+            ]
+        ]
+    },
+    {
+        "id": "do_f2",
+        "type": "function",
+        "z": "tab_descargas",
+        "name": "Consultar ciclos",
+        "func": "// Solo campos numéricos (los que se pueden promediar)\nmsg.campos = (msg.payload || []).filter(r => typeof r._value === \"number\").map(r => r._field).sort();\nmsg.query = \"from(bucket: \\\"estacion\\\")\\n  |> range(start: 2020-01-01T00:00:00Z)\\n  |> filter(fn: (r) => r._measurement == \\\"ciclos\\\")\\n  |> last()\\n  |> pivot(rowKey: [\\\"_time\\\"], columnKey: [\\\"_field\\\"], valueColumn: \\\"_value\\\")\\n  |> filter(fn: (r) => r.estado != \\\"anulado\\\")\";\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 380,
+        "y": 210,
+        "wires": [
+            [
+                "do_db2"
+            ]
+        ]
+    },
+    {
+        "id": "do_db2",
+        "type": "influxdb in",
+        "z": "tab_descargas",
+        "influxdb": "c_influx_local",
+        "name": "Leer InfluxDB",
+        "query": "",
+        "rawOutput": false,
+        "precision": "",
+        "retentionPolicy": "",
+        "org": "trigal",
+        "x": 570,
+        "y": 210,
+        "wires": [
+            [
+                "do_f3"
+            ]
+        ]
+    },
+    {
+        "id": "do_f3",
+        "type": "function",
+        "z": "tab_descargas",
+        "name": "Armar opciones",
+        "func": "const ciclos = (msg.payload || [])\n    .map(r => ({ciclo: r.ciclo, lote: r.lote, ubicacion: r.ubicacion, inicio: r.inicio, fin: r.fin}))\n    .sort((a, b) => b.inicio.localeCompare(a.inicio));\nmsg.payload = {campos: msg.campos, ciclos: ciclos};\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 750,
+        "y": 210,
+        "wires": [
+            [
+                "do_res"
+            ]
+        ]
+    },
+    {
+        "id": "do_res",
+        "type": "http response",
+        "z": "tab_descargas",
+        "name": "",
+        "statusCode": "",
+        "headers": {},
+        "x": 930,
+        "y": 210,
+        "wires": []
+    },
+    {
+        "id": "dd_in",
+        "type": "http in",
+        "z": "tab_descargas",
+        "name": "GET /descarga/csv",
+        "url": "/descarga/csv",
+        "method": "get",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 140,
+        "y": 290,
+        "wires": [
+            [
+                "dd_f1"
+            ]
+        ]
+    },
+    {
+        "id": "dd_f1",
+        "type": "function",
+        "z": "tab_descargas",
+        "name": "Leer criterios",
+        "func": "msg.parametros = msg.req.query || {};\nmsg.query = \"from(bucket: \\\"estacion\\\")\\n  |> range(start: 2020-01-01T00:00:00Z)\\n  |> filter(fn: (r) => r._measurement == \\\"ciclos\\\")\\n  |> last()\\n  |> pivot(rowKey: [\\\"_time\\\"], columnKey: [\\\"_field\\\"], valueColumn: \\\"_value\\\")\\n  |> filter(fn: (r) => r.estado != \\\"anulado\\\")\";\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 350,
+        "y": 290,
+        "wires": [
+            [
+                "dd_db1"
+            ]
+        ]
+    },
+    {
+        "id": "dd_db1",
+        "type": "influxdb in",
+        "z": "tab_descargas",
+        "influxdb": "c_influx_local",
+        "name": "Leer InfluxDB",
+        "query": "",
+        "rawOutput": false,
+        "precision": "",
+        "retentionPolicy": "",
+        "org": "trigal",
+        "x": 540,
+        "y": 290,
+        "wires": [
+            [
+                "dd_f2"
+            ]
+        ]
+    },
+    {
+        "id": "dd_f2",
+        "type": "function",
+        "z": "tab_descargas",
+        "name": "Armar consulta",
+        "func": "// Valida los criterios de búsqueda y arma la consulta\nconst MAX_FILAS = 100000;\nconst p = msg.parametros;\nconst ciclos = (msg.payload || []).filter(c => c.inicio);\nmsg.ciclos = ciclos;\n\nfunction error(texto) {\n    msg.statusCode = 400;\n    msg.headers = {\"Content-Type\": \"application/json; charset=utf-8\"};\n    msg.payload = {ok: false, error: texto};\n    return [null, msg];\n}\nconst fechaOk = f => /^\\d{4}-\\d{2}-\\d{2}$/.test(f || \"\");\nconst hoy = new Date(Date.now() - 5 * 3600000).toISOString().slice(0, 10);\n\nlet desde = p.desde, hasta = p.hasta;\nif (p.ciclo) {\n    const c = ciclos.find(x => x.ciclo === p.ciclo);\n    if (!c) return error(\"No existe el ciclo \" + p.ciclo + \".\");\n    desde = c.inicio;\n    hasta = c.fin || hoy;\n}\nif (!fechaOk(desde) || !fechaOk(hasta)) return error(\"Elija un ciclo o escriba las fechas desde y hasta (AAAA-MM-DD).\");\nif (hasta < desde) return error(\"La fecha hasta es anterior a la fecha desde.\");\n\nconst inicio = new Date(desde + \"T00:00:00-05:00\");\nconst fin = new Date(new Date(hasta + \"T00:00:00-05:00\").getTime() + 86400000);\nmsg.rango = {desde: desde, hasta: hasta};\nmsg.tipo = p.tipo === \"diario\" ? \"diario\" : \"lecturas\";\nmsg.formato = p.formato === \"codigo\" ? \"codigo\" : \"excel\";\nmsg.vista = p.vista === \"1\";\n\nconst encabezado = 'import \"date\"\\nimport \"timezone\"\\noption location = timezone.location(name: \"America/Bogota\")\\n\\n';\n\nif (msg.tipo === \"diario\") {\n    msg.query = encabezado + 'from(bucket: \"estacion\")\\n' +\n        '  |> range(start: ' + inicio.toISOString() + ', stop: ' + fin.toISOString() + ')\\n' +\n        '  |> filter(fn: (r) => r._measurement == \"diario\")\\n' +\n        '  |> keep(columns: [\"_time\", \"_field\", \"_value\"])\\n' +\n        '  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\\n' +\n        '  |> sort(columns: [\"_time\"])';\n    return [msg, null];\n}\n\nconst campos = String(p.campos || \"\").split(\",\").map(s => s.trim()).filter(s => s);\nif (!campos.length) return error(\"Elija al menos una variable.\");\nif (campos.some(c => !/^[A-Za-z0-9_]+$/.test(c))) return error(\"Nombre de variable no válido.\");\nmsg.campos = campos;\n\nconst INTERVALOS = {\"0\": 5, \"1m\": 60, \"5m\": 300, \"15m\": 900, \"1h\": 3600, \"1d\": 86400};\nconst intervalo = p.intervalo in INTERVALOS ? p.intervalo : \"0\";\nmsg.intervalo = intervalo;\n\nlet hd = 0, hh = 24;\nif (p.hora_desde !== undefined && p.hora_desde !== \"\") hd = parseInt(p.hora_desde, 10);\nif (p.hora_hasta !== undefined && p.hora_hasta !== \"\") hh = parseInt(p.hora_hasta, 10);\nif (isNaN(hd) || isNaN(hh) || hd < 0 || hh > 24 || hd >= hh) return error(\"El horario debe ir de 0 a 24 y la hora inicial ser menor que la final.\");\nmsg.horario = {desde: hd, hasta: hh};\n\nconst segundos = (fin - inicio) / 1000 * (hh - hd) / 24;\nconst estimadas = Math.ceil(segundos / INTERVALOS[intervalo]);\nif (!msg.vista && estimadas > MAX_FILAS) {\n    return error(\"La descarga tendría unas \" + estimadas.toLocaleString(\"es-CO\") + \" filas (máximo \" +\n        MAX_FILAS.toLocaleString(\"es-CO\") + \"). Use un intervalo más grande o un rango más corto.\");\n}\n\nmsg.query = encabezado + 'from(bucket: \"estacion\")\\n' +\n    '  |> range(start: ' + inicio.toISOString() + ', stop: ' + fin.toISOString() + ')\\n' +\n    '  |> filter(fn: (r) => r._measurement == \"datos\" and (' + campos.map(c => 'r._field == \"' + c + '\"').join(\" or \") + '))\\n' +\n    (hd > 0 || hh < 24 ? '  |> hourSelection(start: ' + hd + ', stop: ' + (hh - 1) + ')\\n' : '') +\n    (intervalo !== \"0\" ? '  |> aggregateWindow(every: ' + intervalo + ', fn: mean, createEmpty: false, timeSrc: \"_start\")\\n' : '') +\n    '  |> keep(columns: [\"_time\", \"_field\", \"_value\"])\\n' +\n    '  |> group()\\n' +\n    '  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\\n' +\n    '  |> sort(columns: [\"_time\"])\\n' +\n    '  |> limit(n: ' + (msg.vista ? 20 : MAX_FILAS) + ')';\nreturn [msg, null];",
+        "outputs": 2,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 720,
+        "y": 290,
+        "wires": [
+            [
+                "dd_db2"
+            ],
+            [
+                "dd_res"
+            ]
+        ]
+    },
+    {
+        "id": "dd_db2",
+        "type": "influxdb in",
+        "z": "tab_descargas",
+        "influxdb": "c_influx_local",
+        "name": "Leer InfluxDB",
+        "query": "",
+        "rawOutput": false,
+        "precision": "",
+        "retentionPolicy": "",
+        "org": "trigal",
+        "x": 540,
+        "y": 350,
+        "wires": [
+            [
+                "dd_f3"
+            ]
+        ]
+    },
+    {
+        "id": "dd_f3",
+        "type": "function",
+        "z": "tab_descargas",
+        "name": "Armar CSV",
+        "func": "// Arma el CSV (o la vista previa) con lote y ubicación según el ciclo de cada fecha\nconst excel = msg.formato === \"excel\";\nconst sep = excel ? \";\" : \",\";\nconst filas = msg.payload || [];\nconst ciclos = msg.ciclos || [];\n\nconst local = t => new Date(new Date(t).getTime() - 5 * 3600000).toISOString().slice(0, 19);\nfunction cicloDe(dia) {\n    return ciclos.find(c => c.inicio <= dia && (!c.fin || dia <= c.fin)) || {};\n}\nfunction numero(v, dec) {\n    if (typeof v !== \"number\" || isNaN(v)) return \"\";\n    const s = String(+v.toFixed(dec));\n    return excel ? s.replace(\".\", \",\") : s;\n}\nfunction texto(v) {\n    const s = v === undefined || v === null ? \"\" : String(v);\n    return /[\";,\\n]/.test(s) ? '\"' + s.replace(/\"/g, '\"\"') + '\"' : s;\n}\nconst hms = s => typeof s === \"number\" ? new Date(s * 1000).toISOString().slice(11, 19) : \"\";\n\nlet columnas, datos;\nif (msg.tipo === \"diario\") {\n    columnas = [\"fecha\", \"lote\", \"ubicacion\", \"t_max\", \"t_min\", \"t_media\", \"gdd\", \"gdd_acumulado\", \"dli\",\n                \"inicio_luz\", \"fin_luz\", \"fotoperiodo\", \"fotoperiodo_h\", \"cambio_fotoperiodo_min\", \"luz_medida_con\", \"horas_con_datos\"];\n    const acumulado = {};\n    let fotoAnterior = null;\n    datos = filas.map(r => {\n        const conPar = typeof r.fotoperiodo === \"number\";\n        const foto = conPar ? r.fotoperiodo : r.fotoperiodo_lux;\n        const ini = conPar ? r.inicio_luz : r.inicio_luz_lux;\n        const fil = conPar ? r.fin_luz : r.fin_luz_lux;\n        const cambio = (typeof foto === \"number\" && typeof fotoAnterior === \"number\") ? (foto - fotoAnterior) / 60 : null;\n        if (typeof foto === \"number\") fotoAnterior = foto;\n        const dia = local(r._time).slice(0, 10);\n        const c = cicloDe(dia);\n        let gdd = null, acum = null;\n        if (c.ciclo && typeof r.tmedia === \"number\") {\n            const tb = ciclos.find(x => x.ciclo === c.ciclo).tbase;\n            gdd = r.tmedia > tb ? r.tmedia - tb : 0;\n            acumulado[c.ciclo] = (acumulado[c.ciclo] || 0) + gdd;\n            acum = acumulado[c.ciclo];\n        }\n        return [dia, texto(c.lote), texto(c.ubicacion), numero(r.tmax, 2), numero(r.tmin, 2), numero(r.tmedia, 2),\n                numero(gdd, 2), numero(acum, 2), numero(r.dli, 2), hms(ini), hms(fil), hms(foto),\n                numero(typeof foto === \"number\" ? foto / 3600 : null, 3), numero(cambio, 1),\n                typeof foto === \"number\" ? (conPar ? \"PAR\" : \"lux\") : \"\", numero(r.horas_datos, 1)];\n    });\n} else {\n    columnas = [\"fecha_hora\", \"lote\", \"ubicacion\"].concat(msg.campos);\n    datos = filas.map(r => {\n        const t = local(r._time);\n        const c = cicloDe(t.slice(0, 10));\n        return [excel ? t.replace(\"T\", \" \") : t + \"-05:00\", texto(c.lote), texto(c.ubicacion)]\n            .concat(msg.campos.map(f => numero(r[f], 3)));\n    });\n}\n\nif (msg.vista) {\n    msg.headers = {\"Content-Type\": \"application/json; charset=utf-8\"};\n    msg.payload = {ok: true, columnas: columnas, filas: datos.slice(0, 20), mostradas: Math.min(datos.length, 20)};\n    return msg;\n}\n\nconst nombre = \"estacion_trigal_\" + msg.tipo + \"_\" + msg.rango.desde + \"_\" + msg.rango.hasta + (excel ? \"_excel\" : \"\") + \".csv\";\nconst lineas = [columnas.join(sep)].concat(datos.map(f => f.join(sep)));\nmsg.headers = {\n    \"Content-Type\": \"text/csv; charset=utf-8\",\n    \"Content-Disposition\": 'attachment; filename=\"' + nombre + '\"'\n};\nmsg.payload = (excel ? \"﻿\" : \"\") + lineas.join(\"\\r\\n\") + \"\\r\\n\";\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 720,
+        "y": 350,
+        "wires": [
+            [
+                "dd_res"
+            ]
+        ]
+    },
+    {
+        "id": "dd_res",
+        "type": "http response",
+        "z": "tab_descargas",
+        "name": "",
+        "statusCode": "",
+        "headers": {},
+        "x": 930,
+        "y": 320,
+        "wires": []
+    },
+    {
+        "id": "dd_catch",
+        "type": "catch",
+        "z": "tab_descargas",
+        "name": "Error de consulta",
+        "scope": [
+            "dd_db1",
+            "dd_db2",
+            "do_db1",
+            "do_db2"
+        ],
+        "uncaught": false,
+        "x": 540,
+        "y": 410,
+        "wires": [
+            [
+                "dd_err"
+            ]
+        ]
+    },
+    {
+        "id": "dd_err",
+        "type": "function",
+        "z": "tab_descargas",
+        "name": "Respuesta error",
+        "func": "msg.statusCode = 500;\nmsg.headers = {\"Content-Type\": \"application/json; charset=utf-8\"};\nmsg.payload = {ok: false, error: \"Error al consultar InfluxDB: \" + (msg.error ? msg.error.message : \"\")};\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 730,
+        "y": 410,
+        "wires": [
+            [
+                "dd_res"
+            ]
+        ]
+    }
+]

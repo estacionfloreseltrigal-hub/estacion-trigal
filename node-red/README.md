@@ -1,21 +1,19 @@
 # Node-RED
 
-| Archivo | Estado |
+| Archivo | Qué es |
 | --- | --- |
-| `flujo_estacion_trigal.json` | Pestaña "Estación Trigal" (datos → índices DPV y punto de rocío → InfluxDB, órdenes a los LEDs). Versión del 12-nov guardada en el Project. |
-| Pestaña "Ciclos del cultivo" (`/ciclo`) | **Falta**: exportar desde la Pi |
-| Pestaña "Consulta y descarga" (`/descarga`) | **Falta**: exportar desde la Pi |
-| Pestañas de formularios de administración | **Falta**: exportar desde la Pi |
+| `flows.json` | Todos los flujos, copiados de la Pi el 23-nov-2026. Pestañas: **Estación Trigal** (datos → DPV y punto de rocío → InfluxDB, órdenes a los LEDs), **Ciclos del cultivo** (`/ciclo`) y **Consulta y descarga** (`/descarga`). |
+| `settings.js` | Configuración de Node-RED. Los hashes de las claves (`adminAuth` y `httpNodeAuth` de `admin_trigal`) van como `<HASH_BCRYPT>`. |
+| `package.json` | Nodos instalados: `node-red-contrib-influxdb` y `@flowfuse/node-red-dashboard`. |
 
-Los flujos de ciclos y descargas se generaron con scripts y se corrigieron varias veces; reconstruirlos
-desde las conversaciones daría una versión vieja. Para tener los que funcionan:
+Todo va en `/opt/trigal/nodered/data/` en la Pi.
 
-- **Automático:** `recolectar-desde-la-pi.sh` copia `/opt/trigal/nodered/data/flows.json` (todas las pestañas)
-  y `settings.js` con los hashes reemplazados.
-- **A mano:** en `http://10.10.80.48:1880` → menú ☰ → *Exportar* → *Todos los flujos* → *Descargar*, y guardar
-  el archivo aquí como `flows.json`.
+Para reinstalar: copiar los tres archivos, generar los hashes con `docker exec -it node-red node-red admin hash-pw`
+y ponerlos en `settings.js`. Luego reiniciar el contenedor e instalar los nodos (*Manage palette*), o correr `npm install` en `/data`.
 
 Las credenciales de los nodos (token de InfluxDB, clave de Mosquitto) quedan en `flows_cred.json`, que **no** se sube.
 Al importar en otra Node-RED hay que volver a ponerlas en los nodos de configuración `influxdb-local` y `mosquitto-local`.
+
+Para actualizar este archivo: correr `recolectar-desde-la-pi.sh` en la Pi, o en Node-RED ☰ → *Exportar* → *Todos los flujos*.
 
 Guía de uso de las páginas: `docs/descargas.md` y la sección 7 del manual técnico.

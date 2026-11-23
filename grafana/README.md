@@ -1,15 +1,14 @@
 # Grafana
 
-Aquí van los tableros exportados en JSON:
+Tableros copiados de la Pi el 23-nov-2026 por la API de Grafana:
 
-- `trigal-estacion` (principal, el de visitantes en modo kiosco)
-- `trigal-administracion`
+- `dashboards/estacion-trigal.json`: **Estación Trigal**, el principal (39 paneles; el de visitantes en modo kiosco)
+- `dashboards/estacion-trigal-administracion.json`: **Estación Trigal - Administración** (4 paneles)
 
-No se pudieron rescatar de las conversaciones con seguridad: se generaron con scripts y después se
-cambiaron a mano en Grafana (clave de la cámara, paneles de sistema, umbrales del plan de datos).
-La versión buena es la que está en la Pi.
+La clave de la cámara aparece como `<CAM_CLAVE>`. Al importar (Dashboards → New → Import) hay que
+reemplazarla por la real y elegir la fuente de datos InfluxDB.
 
-## Cómo exportarlos
+## Cómo actualizarlos
 
 **Opción A (automática):** correr `recolectar-desde-la-pi.sh` en la Pi y dar la clave de `admin_trigal`
 cuando la pida. Los baja todos a `grafana/dashboards/` y reemplaza la clave de la cámara por `<CAM_CLAVE>`.
