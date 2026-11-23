@@ -26,6 +26,8 @@ Sensores → ESP32-S3 ──USB── Raspberry Pi 4 ── Mosquitto → Node-R
 | `node-red/` | `flows.json` (estación, ciclos, descargas), `settings.js` y `package.json` | `/opt/trigal/nodered/data/` |
 | `influxdb/` | Tarea `indices_diarios` (Tmáx, Tmín, DLI, fotoperiodo) | InfluxDB → Tasks |
 | `grafana/dashboards/` | Tableros *Estación Trigal* y *Estación Trigal - Administración* | Grafana → Import |
+| `hardware/` | Ficha técnica de las sondas de suelo y proyecto de Proteus | — |
+| `CLAUDE.md` | Resumen técnico y reglas para trabajar en el repositorio (contexto para Claude Code) | — |
 
 Todo el contenido se comparó con la Pi `rpi4trigal` el 23-nov-2026: lo que está aquí es lo que corre en la estación.
 

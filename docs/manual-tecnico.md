@@ -1144,7 +1144,7 @@ Para olvidar una red: `sudo nmcli connection delete "NOMBRE_RED"`.
 ### Agregar un sensor o una variable nueva
 
 1. En el firmware, leer el sensor y agregar el campo a la trama `$EST` con un nombre corto en minúsculas, sin tildes ni espacios (por ejemplo `hs=...`).
-2. En `/opt/trigal/app/serial_mqtt.py`, solo si el campo nuevo no aparece en InfluxDB unos minutos después de cargar el firmware, agregar el nombre corto y el nombre largo que tendrá en InfluxDB en el diccionario de nombres que corresponda (`CAMPOS_AMBIENTE`, `CAMPOS_SISTEMA` o `CAMPOS_SUELO`) y reiniciar: `sudo systemctl restart trigal-serial`.
+2. No hay que tocar el puente: un campo que no conoce se guarda en InfluxDB con su nombre corto (por ejemplo `hs`). Solo si se quiere un nombre largo, agregar el par `"nombre_corto": "nombre_largo"` al diccionario `NOMBRES` de `/opt/trigal/app/serial_mqtt.py` y reiniciar: `sudo systemctl restart trigal-serial`.
 3. El campo aparece solo en InfluxDB (medición `datos`) y en la lista de variables de `/descarga`.
 4. Agregar un panel en Grafana (abajo).
 5. Si sirve para un índice, agregar el cálculo en la función *Índices instantáneos* de Node-RED (instantáneo) o en la tarea `indices_diarios` (diario).
@@ -1434,6 +1434,8 @@ Todo el código del proyecto está en el repositorio privado de GitHub **[estaci
 | `node-red/` | `flows.json`, `settings.js` (sin hashes) y `package.json` | `/opt/trigal/nodered/data/` |
 | `influxdb/` | `indices_diarios.flux` | InfluxDB → Tasks |
 | `grafana/dashboards/` | Dashboards exportados | Grafana → Dashboards → Import |
+| `hardware/` | Ficha técnica de las sondas JXBS-3001 y proyecto de Proteus del circuito | — |
+| `CLAUDE.md` | Resumen técnico del proyecto y reglas para trabajar en el repositorio (lo lee Claude Code) | — |
 
 - **La versión que vale es la de la Pi.** El repositorio se comparó archivo por archivo con la Pi el 23 de noviembre de 2026.
 - El `PAYLOAD.ino` del repositorio es el mismo que está cargado en la ESP32 (comparados el 22 de noviembre de 2026). Los archivos de la sección 17 son copia de la carpeta `raspberry/` del repositorio.
@@ -1571,7 +1573,7 @@ El token del túnel está en one.dash.cloudflare.com → *Tunnels* → `rpi4trig
 
 **5. InfluxDB.** Crear los tokens (sección 11) y la tarea `indices_diarios` (*Tasks* → *Create Task* → *New Task*, nombre `indices_diarios`, CRON `10 5 * * *`, pegar el script guardado). Si hay respaldo de datos, restaurarlo.
 
-**6. Node-RED.** Instalar desde *Manage palette* el nodo `node-red-contrib-influxdb`. Importar los flujos guardados, poner las claves en los nodos `mosquitto-local` e `influxdb-local`, configurar `adminAuth` y `httpNodeAuth` en `settings.js` (sección 11) e *Implementar*.
+**6. Node-RED.** Instalar desde *Manage palette* los nodos `node-red-contrib-influxdb` y `@flowfuse/node-red-dashboard` (los dos están en `node-red/package.json`). Importar los flujos guardados, poner las claves en los nodos `mosquitto-local` e `influxdb-local`, configurar `adminAuth` y `httpNodeAuth` en `settings.js` (sección 11) e *Implementar*.
 
 **7. Grafana.** Crear la fuente de datos InfluxDB (lenguaje Flux, URL `http://localhost:8086`, organización `trigal`, token de lectura), importar los dos dashboards, crear la carpeta **Administración** sin el rol *Viewer*, crear `trigal_visor` y fijar el dashboard de inicio (sección 12).
 
@@ -1634,6 +1636,7 @@ Cada cambio en la estación se anota aquí, una línea por cambio, para que quie
 | --- | --- | --- | --- |
 | 2026-11-22 | Entrega a El Trigal: la versión que describe este manual | Equipo del curso | Repositorio `estacion-trigal` e imagen de la microSD |
 | 2026-11-23 | Repositorio completado con los flujos de Node-RED, los dashboards y los archivos de la Pi; revisar-estacion espera 75 s la trama; manual ajustado con los colores reales de los paneles y el formato de HORAS\_FOTO | Equipo del curso | Repositorio (rama main) y este manual |
+| 2026-11-23 | Se agregaron `CLAUDE.md` y la carpeta `hardware/` (ficha de las sondas y Proteus); corregido el paso para agregar una variable (diccionario `NOMBRES` del puente) y el paso 6 de la reinstalación (nodo `@flowfuse/node-red-dashboard`) | Equipo del curso | Repositorio (rama main) |
 |  |  |  |  |
 
 ## 16. Glosario
