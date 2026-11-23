@@ -36,5 +36,4 @@ SparkFun SCD30 Arduino Library, Adafruit TSL2591 Library, Adafruit Unified Senso
 
 ## Pendiente conocido
 
-- PAR en 0.0: falta revisar el registro del sensor con su hoja de datos.
 - Si la ESP32 se traba, el puente de la Pi la reinicia sola (sin tramas completas en 3 min o sin suelo en 30 min).
