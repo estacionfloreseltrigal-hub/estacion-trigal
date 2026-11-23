@@ -161,13 +161,15 @@ El bus I²C usa SDA en **GPIO 8** y SCL en **GPIO 9**. Los registros de las sond
 
 **Caja de control** (numeración de la foto del manual de usuario): resistencias de potencia de 10 W de los LEDs, Raspberry Pi 4 con el módulo 4G, ESP32-S3, conexiones del sensor de luz y del de CO₂, borneras de los MOSFET de potencia (ventiladores, LED UV y LEDs blancos), fuente de 12 V, módulo RS485, multitoma, ventilador de la caja, MOSFET, breaker de protección y bornera aérea.
 
-> **Confirmado con el firmware cargado (`PAYLOAD.ino` del 21-nov-2026, el mismo del repositorio) y correcciones pendientes en el manual de usuario:**
+> **Confirmado con el firmware cargado (`PAYLOAD.ino` del 21-nov-2026, el mismo del repositorio):**
 >
-> 1. **Bus RS485:** el firmware usa 4800 baudios, el PAR con dirección 1 y las sondas con 4, 2 y 3. El anexo del manual de usuario dice 9600 baudios y sondas 2, 3 y 4: hay que corregir el manual de usuario.
-> 2. **DHT22:** mide la temperatura dentro de la caja (`temp_caja`) para controlar el ventilador; no mide el aire del cultivo. Corregir el manual de usuario.
+> 1. **Bus RS485:** 4800 baudios, el PAR con dirección 1 y las sondas con 4, 2 y 3 (ya corregido en el manual de usuario).
+> 2. **DHT22:** mide la temperatura dentro de la caja (`temp_caja`) para controlar el ventilador; no mide el aire del cultivo (ya corregido en el manual de usuario).
 > 3. **Pines:** LEDs blancos en GPIO 6, LED UV en GPIO 10, ventilador en GPIO 5 (prende a 25 °C y apaga a 22 °C) y DHT22 en GPIO 4. Una versión anterior del código usaba 13 y 14 para los LEDs.
-> 4. **Tiempo de arranque:** el manual de usuario dice que en unos 2 minutos ya está midiendo. Es correcto para los datos; todos los servicios (túnel, cámara y revisión automática) quedan listos en unos 7 minutos.
-> 5. **Fuente de 12 V a 110 V (pendiente):** revisar si la fuente tiene selector de 110/220 V antes de conectarla a una toma de 110 V.
+> 4. **Tiempo de arranque:** en unos 2 minutos ya está midiendo; todos los servicios (túnel, cámara y revisión automática) quedan listos en unos 7 minutos.
+> 5. **Fuente de 12 V:** la Mean Well LRS-35-12 no tiene selector de voltaje porque su entrada es universal (85 a 264 VAC): funciona igual en tomas de 110 V y de 220 V.
+
+Las fichas técnicas de los componentes están en la carpeta `hardware/fichas/` del repositorio.
 
 **Energía**
 
@@ -221,7 +223,7 @@ La estación se conecta con un solo cable a 220 V (invernaderos de El Trigal) o 
 | Trípode y mástil | 1 | Estructura (fabricada por Multivallas Medellín) |
 | Cables, borneras DC, amarres, tornillería y piezas impresas en PLA | Varios | Montaje |
 
-La mayoría de los componentes electrónicos se compraron en Didácticas Electrónicas (Medellín). Guarde las fichas técnicas de los sensores junto con el repositorio: ahí están los registros Modbus y los rangos de medida.
+La mayoría de los componentes electrónicos se compraron en Didácticas Electrónicas (Medellín). Las fichas técnicas de los sensores, la fuente, los MOSFET, la ESP32-S3 y el módulo 4G están en `hardware/fichas/` del repositorio: ahí están los registros Modbus y los rangos de medida.
 
 ## 4. Firmware de la ESP32-S3
 
@@ -1434,7 +1436,7 @@ Todo el código del proyecto está en el repositorio privado de GitHub **[estaci
 | `node-red/` | `flows.json`, `settings.js` (sin hashes) y `package.json` | `/opt/trigal/nodered/data/` |
 | `influxdb/` | `indices_diarios.flux` | InfluxDB → Tasks |
 | `grafana/dashboards/` | Dashboards exportados | Grafana → Dashboards → Import |
-| `hardware/` | Ficha técnica de las sondas JXBS-3001 y proyecto de Proteus del circuito | — |
+| `hardware/` | Fichas técnicas de todos los componentes y proyecto de Proteus del circuito | — |
 | `CLAUDE.md` | Resumen técnico del proyecto y reglas para trabajar en el repositorio (lo lee Claude Code) | — |
 
 - **La versión que vale es la de la Pi.** El repositorio se comparó archivo por archivo con la Pi el 23 de noviembre de 2026.
@@ -1636,6 +1638,7 @@ Cada cambio en la estación se anota aquí, una línea por cambio, para que quie
 | --- | --- | --- | --- |
 | 2026-11-22 | Entrega a El Trigal: la versión que describe este manual | Equipo del curso | Repositorio `estacion-trigal` e imagen de la microSD |
 | 2026-11-23 | Repositorio completado con los flujos de Node-RED, los dashboards y los archivos de la Pi; revisar-estacion espera 75 s la trama; manual ajustado con los colores reales de los paneles y el formato de HORAS\_FOTO | Equipo del curso | Repositorio (rama main) y este manual |
+| 2026-11-23 | Fichas técnicas de todos los componentes en `hardware/fichas/` (incluye los registros Modbus del PAR); confirmado que la fuente de 12 V es de entrada universal; manual de usuario ya corregido (RS485 y DHT22) | Equipo del curso | Repositorio (rama main) |
 | 2026-11-23 | Se agregaron `CLAUDE.md` y la carpeta `hardware/` (ficha de las sondas y Proteus); corregido el paso para agregar una variable (diccionario `NOMBRES` del puente) y el paso 6 de la reinstalación (nodo `@flowfuse/node-red-dashboard`) | Equipo del curso | Repositorio (rama main) |
 |  |  |  |  |
 

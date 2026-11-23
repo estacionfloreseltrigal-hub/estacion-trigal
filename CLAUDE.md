@@ -62,7 +62,7 @@ Sensores → ESP32-S3 ──USB (trama $EST cada 60 s)── Raspberry Pi 4 (rpi
 | `node-red/` | `flows.json` (pestañas *Estación Trigal*, *Ciclos del cultivo*, *Consulta y descarga*), `settings.js` (hashes como `<HASH_BCRYPT>`), `package.json` | `/opt/trigal/nodered/data/` |
 | `influxdb/indices_diarios.flux` | Tarea diaria (Tmáx, Tmín, Tmedia, DLI, fotoperiodo) | InfluxDB → Tasks |
 | `grafana/dashboards/` | `estacion-trigal.json` (principal, uid `trigal-estacion`) y `estacion-trigal-administracion.json` | Grafana → Import |
-| `hardware/` | Ficha de las sondas JXBS-3001 y proyecto de Proteus | — |
+| `hardware/` | Fichas técnicas de todos los componentes (`fichas/`, con los registros Modbus del PAR) y proyecto de Proteus | — |
 | `recolectar-desde-la-pi.sh` | Copia lo que corre en la Pi a este repositorio, quitando claves | Se ejecuta en la Pi |
 
 ## Regla principal: la versión que vale es la de la Pi
@@ -189,7 +189,7 @@ Antes de una instalación: prueba de arranque en frío y prueba solo con 4G (sec
 ## Decisiones ya tomadas (no reabrir sin que lo pida el equipo o El Trigal)
 
 - Sin PCB: fuente de 12 V, Pi y módulo 4G alimentados por separado desde una multitoma; la fuente de 12 V no
-  alimenta el 4G.
+  alimenta el 4G. La fuente (Mean Well LRS-35-12) es de entrada universal, 85 a 264 VAC, sin selector: sirve a 110 y 220 V.
 - Todos los datos en un solo tópico MQTT, por sugerencia del profesor.
 - Sin Cloudflare Access: pide registrar una tarjeta. Solo se menciona como opción de El Trigal, nunca como requisito.
 - Un solo usuario de consulta (`trigal_visor`, Viewer); edición solo con `admin_trigal`. Kiosco solo para visitantes,
@@ -199,15 +199,11 @@ Antes de una instalación: prueba de arranque en frío y prueba solo con 4G (sec
 
 ## Pendientes conocidos
 
-- Corregir el manual de usuario: RS485 a 4800 baudios y sondas con IDs 4, 2 y 3 (dice 9600 y 2, 3, 4); el DHT22 mide la
-  caja, no el aire del cultivo.
-- Revisar si la fuente de 12 V tiene selector 110/220 V antes de usarla a 110 V.
 - Intervalos de lectura distintos por sensor en la ESP32 (las sondas en sustrato varían poco), sin perder la utilidad
   en otras condiciones. Cambio de firmware aplazado.
 - Recalibrar el SCD30 al aire libre (marcó unos 320 ppm en laboratorio) y validar T-base y umbrales con El Trigal.
 - Cambiar el *Max* del panel "Datos 4G este mes" al tamaño real del paquete.
 - El manual dice que este repositorio es privado; confirmar su visibilidad en GitHub (Settings → General → Danger Zone).
-- Faltan en `hardware/fichas/` las fichas del PAR SEN0641, SCD30, TSL2591, DFR0457 y SIM7600G-H.
 - Recomendaciones para una siguiente versión: RTC DS3231, alertas por Telegram o correo, respaldo semanal programado.
 
 ## Cómo trabajar en este repositorio
@@ -216,5 +212,5 @@ Antes de una instalación: prueba de arranque en frío y prueba solo con 4G (sec
 - Comandos para la Pi completos y uno por línea; el equipo y El Trigal no son expertos en Linux.
 - Cada cambio que afecte la operación se refleja en `docs/manual-tecnico.md` (sección correspondiente y registro de
   cambios de la sección 15) y, si cambia un archivo de la sección 17, también ahí.
-- No inventar valores agronómicos ni de hardware: si algo no está en el manual, el firmware o la ficha técnica,
-  preguntar.
+- No inventar valores agronómicos ni de hardware: si algo no está en el manual, el firmware o las fichas de
+  `hardware/fichas/`, preguntar.

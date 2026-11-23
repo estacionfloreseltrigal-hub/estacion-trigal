@@ -22,6 +22,7 @@ Thumbs.db
 fotos/
 *.jpg
 *.jpeg
+!hardware/**/*.jpg
 *.mp4
 *.csv
 *.tar.gz
