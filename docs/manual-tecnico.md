@@ -1280,7 +1280,7 @@ La dirección y la velocidad elegidas deben coincidir con los `#define` `ID_SENS
 
 ## 13. Verificación y solución de problemas
 
-La primera herramienta ante cualquier duda es `revisar-estacion`. Revisa la Pi, el 4G y el WiFi, los servicios, los contenedores, la cadena ESP32 → MQTT → Node-RED → InfluxDB → Grafana, la cámara, las fotos y el dashboard público. Termina con "Todo lo esencial está funcionando" o con la lista de lo que falla. Se ejecuta sola 6 min después de cada arranque y deja el resultado en `~/ultimo-arranque.txt`.
+La primera herramienta ante cualquier duda es `revisar-estacion`. Revisa la Pi, el 4G y el WiFi, los servicios, los contenedores, la cadena ESP32 → MQTT → Node-RED → InfluxDB → Grafana, la cámara, las fotos y el dashboard público. Termina con "Todo lo esencial está funcionando" o con la lista de lo que falla. La prueba de datos espera hasta 75 s una trama, porque la ESP32 envía cada 60 s; por eso la revisión tarda alrededor de un minuto. Se ejecuta sola 6 min después de cada arranque y deja el resultado en `~/ultimo-arranque.txt`.
 
 ```bash
 revisar-estacion              # revisión completa ahora
@@ -1361,6 +1361,7 @@ Durante esos 3 minutos: en connect.raspberrypi.com, `rpi4trigal` debe aparecer *
 | CO₂, temperatura y humedad en 0 o sin datos, y SCD30 "Sin conexión" | Bus I²C: cable suelto, SDA/SCL cruzados, sin 3,3 V o pin SEL del SCD30 en alto | Revisar cableado (SDA GPIO 8, SCL GPIO 9, GND común); el SCD30 y el TSL2591 deben responder en `0x61` y `0x29` |
 | PAR en 0 con luz | Registro o función Modbus del sensor PAR | Revisar con la ficha técnica el registro (`REG_PAR`) y `PAR_USA_REG_ENTRADA` |
 | Una sonda de suelo sin datos | Cable RS485 (A/B) o dirección Modbus | Revisar cables (café +V, negro GND, amarillo A, azul B) y que el ID coincida con el firmware |
+| Sondas de suelo con humedad 0 %, CE 0 y pH 7 exacto | La sonda está al aire o en sustrato seco: sin humedad no mide CE y el pH queda en 7 por defecto. La comunicación sí funciona (la temperatura es real) | Normal si la estación está guardada. En campo: enterrar las agujas completas en sustrato regado, sin aire alrededor |
 | *Tomar foto* da "la ESP32 no confirmó la luz" | La ESP32 no recibe la orden o no responde | Revisar que `trigal-serial` está activo; probar `{"cmd":"ping"}` (sección 4) |
 | Las fotos no se actualizan en el dashboard | Cámara detenida o clave remota incorrecta en el panel | `systemctl status camara`; `curl -s localhost:3333/foto/estado`; revisar `data-cam` |
 | El video no abre por internet | Ruta `cam.` del túnel o `CAM_CLAVE` | Probar `https://cam.trigal-digital.com/<CAM_CLAVE>/foto/estado` |
