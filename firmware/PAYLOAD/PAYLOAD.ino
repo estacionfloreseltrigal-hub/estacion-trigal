@@ -1,6 +1,6 @@
 /*
 Proyecto: Estación portátil de monitoreo para cultivo de Antirrhinum majus
-Autores:  Jayder J, Sara G, Isabella T, Mariana C, Paola R, Juan Jose V, Sofia V.
+Autores:  Jayder J, Sara G, Mariana C, Paola R, Juan Jose V, Sofia V.
 Descripción: Lee los sensores con un intervalo propio para cada grupo y envía la trama $EST
 a la Raspberry Pi por USB serial:
   - Luz (PAR y TSL2591), aire (SCD30) y caja (DHT22): se leen cada T_LECTURA.
