@@ -32,6 +32,32 @@ Todo el contenido se comparó con la Pi `rpi4trigal` el 23-nov-2026: lo que est�
 La instalación desde cero, los accesos, el uso del tablero y la solución de problemas están en
 [`docs/manual-tecnico.md`](docs/manual-tecnico.md) (sección 14: respaldo y reinstalación).
 
+## Replicar la estación
+
+Con este repositorio se puede montar la estación desde cero, en otra Raspberry o en una estación nueva. Se necesitan
+tres cosas:
+
+1. **Este repositorio:** todo el código y la configuración (firmware, puente, cámara, scripts, servicios, contenedores,
+   flujos de Node-RED, tarea de InfluxDB y tableros de Grafana).
+2. **El manual técnico** ([`docs/manual-tecnico.md`](docs/manual-tecnico.md)): el armado y el cableado (secciones 3 y 4),
+   y la **reinstalación desde cero en 13 pasos** (sección 14, "Reinstalación desde cero"), que dice qué archivo del
+   repositorio va en cada lugar. Los archivos cortos de configuración están completos en la sección 17.
+3. **Lo que no está aquí a propósito** (ver abajo): las claves, que están en la bóveda de Bitwarden "Estación Trigal",
+   y las cuentas externas (Cloudflare, Google Drive, Raspberry Pi Connect y la SIM de Claro).
+
+Orden general: armar el hardware y cargar `firmware/PAYLOAD/PAYLOAD.ino` → instalar Raspberry Pi OS → módulo 4G →
+Docker y contenedores (`docker/`) → InfluxDB, Node-RED y Grafana (`influxdb/`, `node-red/`, `grafana/`) → puente y
+cámara (`raspberry/`) → fotos a Drive, métricas y revisión → probar con `revisar-estacion` hasta que diga
+"Todo lo esencial está funcionando".
+
+**Si es una estación adicional** (no un reemplazo): usar otro nombre en `ESTACION` de `trigal.env` (por ejemplo
+`estacion2`, que cambia los tópicos MQTT; en `node-red/flows.json` hay que cambiar también `trigal/estacion1/…`
+por el nuevo nombre), crear un túnel nuevo en Cloudflare con su propio subdominio y usar
+otra SIM. Las rutas del túnel actual quedan guardadas en Cloudflare y solo sirven para reemplazar la Pi.
+
+La forma más rápida de recuperar **esta** estación no es reinstalar, sino grabar la imagen completa de la microSD
+(sección 14 del manual).
+
 ## Lo que NO está en el repositorio (a propósito)
 
 Claves, tokens y hashes nunca se suben. En los archivos aparecen como marcadores (`<CAM_CLAVE>`, `<MQTT_PASS>`,
