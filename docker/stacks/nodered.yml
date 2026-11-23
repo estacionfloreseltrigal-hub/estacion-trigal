@@ -1,0 +1,11 @@
+# nodered
+services:
+  node-red:
+    image: nodered/node-red:latest
+    container_name: node-red
+    restart: unless-stopped
+    network_mode: host
+    environment: [TZ=America/Bogota]
+    volumes:
+      - /opt/trigal/nodered/data:/data
+      - /opt/trigal/fotos:/fotos:ro

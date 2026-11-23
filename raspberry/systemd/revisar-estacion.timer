@@ -1,0 +1,9 @@
+[Unit]
+Description=Estacion Trigal - revisar 6 minutos despues de encender
+
+[Timer]
+OnBootSec=6min
+Unit=revisar-estacion.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,7 @@
+[Unit]
+Description=Estacion Trigal - metricas del sistema (4G, disco, temperatura) a InfluxDB
+After=docker.service vnstat.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/metricas-sistema

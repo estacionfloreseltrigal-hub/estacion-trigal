@@ -1,0 +1,18 @@
+# grafana (variable GRAFANA_PASSWORD en Portainer)
+services:
+  grafana:
+    image: grafana/grafana-enterprise
+    container_name: grafana
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - TZ=America/Bogota
+      - GF_SECURITY_ADMIN_USER=admin_trigal
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_PANELS_DISABLE_SANITIZE_HTML=true
+      - GF_SERVER_ROOT_URL=https://iot.trigal-digital.com
+      - GF_SERVER_DOMAIN=iot.trigal-digital.com
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+    volumes:
+      - /opt/trigal/grafana/data:/var/lib/grafana

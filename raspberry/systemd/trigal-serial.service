@@ -1,0 +1,15 @@
+[Unit]
+Description=Estacion Trigal - puente serial ESP32 -> MQTT
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+User=trigal
+Group=dialout
+Environment=TRIGAL_ENV=/opt/trigal/app/trigal.env
+ExecStart=/usr/bin/python3 /opt/trigal/app/serial_mqtt.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

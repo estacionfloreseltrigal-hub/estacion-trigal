@@ -1,0 +1,6 @@
+# Reconstruido a partir de los import de main.py (el original es el del repositorio fastapi-cam del profesor)
+fastapi
+uvicorn
+opencv-python-headless
+numpy
+paho-mqtt>=2.0

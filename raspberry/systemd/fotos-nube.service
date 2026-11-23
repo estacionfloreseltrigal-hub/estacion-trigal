@@ -1,0 +1,9 @@
+[Unit]
+Description=Estacion Trigal - subir fotos a Google Drive
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=trigal
+ExecStart=/usr/local/bin/fotos-nube.sh

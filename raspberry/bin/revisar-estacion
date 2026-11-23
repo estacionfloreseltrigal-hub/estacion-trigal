@@ -1,0 +1,172 @@
+#!/bin/bash
+# Revisión completa de la Estación Trigal (rpi4trigal)
+# Uso: revisar-estacion        (como usuario trigal, sin sudo)
+
+OK=0; MAL=0; AVISO=0
+ok()    { echo "  ✅ $1"; OK=$((OK+1)); }
+mal()   { echo "  ❌ $1"; [ -n "$2" ] && echo "     → $2"; MAL=$((MAL+1)); }
+aviso() { echo "  ⚠️  $1"; [ -n "$2" ] && echo "     → $2"; AVISO=$((AVISO+1)); }
+
+ENV=/opt/trigal/app/trigal.env
+URL_PUBLICA=https://iot.trigal-digital.com
+
+echo "Estación Trigal — $(date '+%Y-%m-%d %H:%M:%S')   (encendida hace $(uptime -p | sed 's/up //'))"
+
+echo
+echo "1. Raspberry"
+if [ "$(timedatectl show -p NTPSynchronized --value 2>/dev/null)" = "yes" ]; then
+  ok "Reloj sincronizado por internet"
+else
+  mal "Reloj sin sincronizar (la hora puede estar mal)" "Normal los primeros minutos sin internet; si sigue, revisar la red"
+fi
+if command -v vcgencmd >/dev/null; then
+  T=$(vcgencmd measure_temp | grep -o '[0-9.]*')
+  if awk "BEGIN{exit !($T < 75)}"; then ok "Temperatura CPU ${T} °C"; else aviso "Temperatura CPU alta: ${T} °C" "Revisar ventilación de la caja"; fi
+  TH=$(vcgencmd get_throttled | cut -d= -f2)
+  if [ "$TH" = "0x0" ]; then ok "Alimentación estable (sin bajo voltaje)"
+  elif [ $((TH & 0x1)) -ne 0 ]; then mal "Bajo voltaje AHORA ($TH)" "Revisar el cargador oficial de la Pi"
+  else aviso "Hubo bajo voltaje desde que encendió ($TH)" "Revisar cargador y cable de la Pi"; fi
+fi
+USO=$(df --output=pcent / | tail -1 | tr -dc 0-9)
+if [ "$USO" -lt 85 ]; then ok "microSD al ${USO}%"; else mal "microSD casi llena (${USO}%)" "Revisar ~/fotos y que fotos-nube esté subiendo"; fi
+
+echo
+echo "2. Red 4G"
+if ip -br addr show usb0 2>/dev/null | grep -q 'UP\|UNKNOWN'; then
+  IP4=$(ip -4 -br addr show usb0 | awk '{print $3}')
+  if [ -n "$IP4" ]; then ok "Módem 4G conectado (usb0 $IP4)"; else mal "usb0 existe pero sin IP" "sudo nmcli connection up claro4g"; fi
+else
+  mal "No aparece usb0 (módem 4G)" "Revisar USB y fuente del HAT; luego sudo nmcli connection up claro4g"
+fi
+SALIDA=$(ip route get 1.1.1.1 2>/dev/null | grep -o 'dev [^ ]*' | cut -d' ' -f2)
+if [ "$SALIDA" = "usb0" ]; then ok "Internet sale por el 4G (usb0)"
+elif [ -n "$SALIDA" ]; then mal "Internet sale por $SALIDA, no por el 4G" "Ese wifi puede bloquear el túnel: aplicar never-default al wifi (ver guía)"
+else mal "Sin ruta a internet"; fi
+WIFI=$(nmcli -t -f NAME,DEVICE connection show --active 2>/dev/null | grep ':wlan0$' | cut -d: -f1)
+if [ -n "$WIFI" ]; then
+  if [ "$(nmcli -g ipv4.never-default connection show "$WIFI" 2>/dev/null)" = "yes" ]; then
+    ok "Wifi \"$WIFI\" solo para red local (never-default)"
+  else
+    aviso "Wifi \"$WIFI\" puede quitarle la salida a internet al 4G" "sudo nmcli connection modify \"$WIFI\" ipv4.never-default yes ipv6.never-default yes"
+  fi
+fi
+if ping -I usb0 -c 2 -W 5 8.8.8.8 >/dev/null 2>&1; then ok "IPv4 por 4G responde"
+else aviso "IPv4 por 4G no responde" "Pendiente: corregir perfil 1 del módem (APN), ver chat del túnel"; fi
+C6=$(curl -6 --interface usb0 -s -o /dev/null -m 10 -w "%{http_code}" http://connectivitycheck.gstatic.com/generate_204 2>/dev/null)
+if [ "$C6" = "204" ]; then ok "IPv6 por 4G responde"; else aviso "IPv6 por 4G no responde ($C6)"; fi
+[ "$(systemctl is-enabled ModemManager 2>/dev/null)" = "enabled" ] && mal "ModemManager está activado (choca con el módem)" "sudo systemctl disable --now ModemManager"
+
+echo
+echo "3. Servicios que arrancan solos"
+for u in docker trigal-serial camara fotos-nube.timer lte-watchdog.timer; do
+  E=$(systemctl is-enabled $u 2>/dev/null); A=$(systemctl is-active $u 2>/dev/null)
+  if [ "$E" = "enabled" ] && [ "$A" = "active" ]; then ok "$u (activo y arranca solo)"
+  elif [ "$E" != "enabled" ]; then mal "$u NO arranca solo (is-enabled: ${E:-no existe})" "sudo systemctl enable --now $u"
+  else mal "$u está $A" "journalctl -u $u -n 30"; fi
+done
+
+echo
+echo "4. Contenedores Docker"
+if docker info >/dev/null 2>&1; then
+  while IFS='|' read -r N S R; do
+    if [ "$S" != "running" ]; then mal "$N está $S" "docker logs --tail 30 $N"
+    elif [ "$R" = "no" ] || [ -z "$R" ]; then mal "$N corre, pero NO vuelve solo tras reiniciar" "docker update --restart unless-stopped $N"
+    else ok "$N corriendo (restart: $R)"; fi
+  done < <(docker ps -aq | xargs -r docker inspect -f '{{.Name}}|{{.State.Status}}|{{.HostConfig.RestartPolicy.Name}}' | sed 's#^/##')
+else
+  mal "No se puede consultar Docker" "¿Está el usuario en el grupo docker? ¿docker activo?"
+fi
+
+echo
+echo "5. Cadena de datos ESP32 → MQTT → Node-RED → InfluxDB → Grafana"
+[ -e /dev/esp32 ] && ok "ESP32 conectada (/dev/esp32)" || mal "No aparece /dev/esp32" "Revisar cable USB de la ESP32"
+ss -ltn 2>/dev/null | grep -q ':1883 ' && ok "Mosquitto escuchando (1883)" || mal "Mosquitto no escucha en 1883"
+if [ -r "$ENV" ]; then
+  R=$(python3 -W ignore - "$ENV" <<'PY' 2>/dev/null
+import sys, time, json
+conf = {}
+for l in open(sys.argv[1]):
+    l = l.strip()
+    if l and not l.startswith('#') and '=' in l:
+        k, v = l.split('=', 1); conf[k.strip()] = v.strip()
+import paho.mqtt.client as mqtt
+try:
+    c = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1, client_id="revisar-estacion")
+except AttributeError:
+    c = mqtt.Client(client_id="revisar-estacion")
+got = []
+c.on_message = lambda cl, u, m: got.append(m.payload.decode(errors="replace"))
+if conf.get("MQTT_USER"):
+    c.username_pw_set(conf["MQTT_USER"], conf.get("MQTT_PASS"))
+try:
+    c.connect(conf.get("MQTT_HOST", "localhost"), int(conf.get("MQTT_PORT", 1883)), 30)
+except Exception as e:
+    print("ERR conexión:", e); sys.exit()
+c.subscribe("trigal/" + conf.get("ESTACION", "estacion1") + "/datos", 0)
+c.loop_start()
+t = time.time()
+while not got and time.time() - t < 20:
+    time.sleep(0.5)
+c.loop_stop()
+if not got:
+    print("NADA")
+else:
+    try:
+        d = json.loads(got[-1]); print("OK", len(d), ", ".join(sorted(d)))
+    except Exception:
+        print("OK ? " + got[-1][:120])
+PY
+)
+  case "$R" in
+    OK*) set -- $R; ok "Llegan datos a trigal/estacion1/datos ($2 campos)"; echo "     campos: ${R#OK * }";;
+    NADA) mal "No llegó ningún dato en 20 s" "journalctl -u trigal-serial -n 30";;
+    *) mal "Prueba MQTT falló: $R";;
+  esac
+else
+  aviso "No se pudo leer $ENV para probar MQTT"
+fi
+NR=$(curl -s -o /dev/null -m 5 -w "%{http_code}" http://localhost:1880/)
+[ "$NR" = "200" ] || [ "$NR" = "401" ] && ok "Node-RED responde" || mal "Node-RED no responde ($NR)"
+curl -s -m 5 http://localhost:8086/health | grep -q '"pass"' && ok "InfluxDB sano" || mal "InfluxDB no responde"
+curl -s -m 5 http://localhost:3000/api/health | grep -q '"ok"' && ok "Grafana sano" || mal "Grafana no responde"
+
+echo
+echo "6. Cámara y fotos"
+EST=$(curl -s -m 5 http://localhost:3333/foto/estado)
+if [ -n "$EST" ]; then
+  echo "$EST" | python3 -c '
+import sys, json
+d = json.load(sys.stdin)
+print("MQTT=" + str(d.get("mqtt")) + " RELOJ=" + str(d.get("reloj_sincronizado")) + " ULT=" + str((d.get("ultimo_resultado") or {}).get("ok")))' > /tmp/cam_est 2>/dev/null
+  C=$(cat /tmp/cam_est 2>/dev/null)
+  ok "Servidor de cámara responde (3333)"
+  echo "$C" | grep -q "MQTT=conectado" && ok "Cámara conectada a Mosquitto (puede pedir luces a la ESP)" || mal "Cámara sin MQTT ($C)" "journalctl -u camara -n 30"
+  echo "$C" | grep -q "ULT=False" && aviso "La última foto falló" "journalctl -u camara --since today | grep Fotos"
+else
+  mal "Servidor de cámara no responde" "journalctl -u camara -n 30"
+fi
+ULT=$(find ~/fotos -name '*.jpg' -printf '%T@ %f\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2)
+[ -n "$ULT" ] && ok "Última foto en microSD: $ULT" || aviso "No hay fotos en ~/fotos todavía"
+NEXT=$(systemctl list-timers fotos-nube.timer --no-legend 2>/dev/null | awk '{print $1, $2, $3}')
+[ -n "$NEXT" ] && ok "Próxima subida a Drive: $NEXT"
+
+echo
+echo "7. Acceso remoto (Cloudflare)"
+REG=$(docker logs --since 30m cloudflared 2>&1 | grep -c "Registered tunnel connection")
+ULTL=$(docker logs --since 30m cloudflared 2>&1 | grep -E "Registered tunnel|Unregistered|ERR" | tail -1)
+if [ "$REG" -gt 0 ] && ! echo "$ULTL" | grep -q "ERR\|Unregistered"; then ok "Túnel conectado ($REG conexiones en los últimos 30 min)"
+elif [ "$REG" -eq 0 ] && [ "$(docker inspect -f '{{.State.Running}}' cloudflared 2>/dev/null)" = "true" ]; then
+  aviso "Sin eventos recientes del túnel en el log" "Lo confirma la prueba de la URL pública (abajo)"
+else mal "Túnel con problemas: $ULTL" "docker restart cloudflared"; fi
+P=$(curl -s -o /dev/null -m 20 -w "%{http_code}" $URL_PUBLICA/api/health)
+case "$P" in
+  200|302|401) ok "$URL_PUBLICA responde ($P)";;
+  530) mal "$URL_PUBLICA da Error 1033 (túnel caído)" "Revisar sección 2 (red) y docker logs cloudflared";;
+  502) mal "$URL_PUBLICA da 502 (túnel bien, Grafana no responde)";;
+  *) mal "$URL_PUBLICA no responde ($P)";;
+esac
+
+echo
+echo "Resumen: ✅ $OK   ⚠️  $AVISO   ❌ $MAL"
+[ "$MAL" -eq 0 ] && echo "Todo lo esencial está funcionando." || echo "Revisar los ❌ de arriba."
+exit $MAL

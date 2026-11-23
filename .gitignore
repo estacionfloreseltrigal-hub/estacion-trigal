@@ -1,0 +1,27 @@
+# Claves y credenciales: nunca se suben
+*.env
+!*.env.ejemplo
+passwd
+flows_cred.json
+.flows_cred.json.backup
+rclone.conf
+*.pem
+*.key
+credentials.json
+Credenciales*
+
+# Entornos y temporales
+.venv/
+venv/
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+
+# Datos pesados (las fotos van a Google Drive; los datos se descargan desde /descarga)
+fotos/
+*.jpg
+*.jpeg
+*.mp4
+*.csv
+*.tar.gz

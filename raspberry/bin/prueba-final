@@ -1,0 +1,143 @@
+#!/bin/bash
+# Prueba final de la Estación Trigal (rpi4trigal): revisa todo antes de dejarla funcionando sola.
+# Uso: prueba-final    (como usuario trigal, sin sudo)
+
+OK=0; MAL=0; AVISO=0
+ok()    { echo "  ✅ $1"; OK=$((OK+1)); }
+mal()   { echo "  ❌ $1"; [ -n "$2" ] && echo "     → $2"; MAL=$((MAL+1)); }
+aviso() { echo "  ⚠️  $1"; [ -n "$2" ] && echo "     → $2"; AVISO=$((AVISO+1)); }
+
+URL_PUBLICA=https://iot.trigal-digital.com
+CHECK_URL=http://connectivitycheck.gstatic.com/generate_204
+
+# Cuenta lecturas por campo en InfluxDB: campos_influx <medicion> <minutos>
+campos_influx() {
+  docker exec influxdb influx query --raw "from(bucket: \"estacion\") |> range(start: -$2m) |> filter(fn: (r) => r._measurement == \"$1\") |> group(columns: [\"_field\"]) |> count() |> keep(columns: [\"_field\", \"_value\"])" 2>/dev/null |
+  python3 -c '
+import sys
+cab = None
+for linea in sys.stdin:
+    linea = linea.strip()
+    if not linea or linea.startswith("#"):
+        continue
+    partes = linea.split(",")
+    if "_field" in partes and "_value" in partes:
+        cab = partes
+        continue
+    if cab:
+        d = dict(zip(cab, partes))
+        print(d.get("_field"), d.get("_value"))
+'
+}
+
+echo "Prueba final Estación Trigal — $(date '+%Y-%m-%d %H:%M:%S')   (encendida hace $(uptime -p | sed 's/up //'))"
+
+echo
+echo "1. Raspberry"
+[ "$(timedatectl show -p NTPSynchronized --value 2>/dev/null)" = "yes" ] && ok "Reloj sincronizado" || mal "Reloj sin sincronizar" "Sin internet no hay hora correcta: revisar el 4G"
+T=$(vcgencmd measure_temp 2>/dev/null | grep -o '[0-9.]*')
+[ -n "$T" ] && { awk "BEGIN{exit !($T < 75)}" && ok "Temperatura CPU ${T} °C" || aviso "Temperatura CPU alta: ${T} °C" "Revisar ventilación de la caja"; }
+TH=$(vcgencmd get_throttled 2>/dev/null | cut -d= -f2)
+if [ "$TH" = "0x0" ]; then ok "Alimentación estable (sin bajo voltaje)"
+elif [ -n "$TH" ] && [ $((TH & 0x1)) -ne 0 ]; then mal "Bajo voltaje AHORA ($TH)" "Revisar cargador y cable de la Pi"
+else aviso "Hubo bajo voltaje desde que encendió ($TH)" "Revisar cargador y cable de la Pi"; fi
+USO=$(df --output=pcent / | tail -1 | tr -dc 0-9)
+[ "$USO" -lt 85 ] && ok "microSD al ${USO}%" || mal "microSD casi llena (${USO}%)" "Revisar ~/fotos y fotos-nube"
+[ "$(journalctl --list-boots --no-pager 2>/dev/null | grep -c .)" -gt 1 ] && ok "Registros del sistema persistentes" || \
+  { [ -f /etc/systemd/journald.conf.d/50-persistente.conf ] && ok "Registros del sistema persistentes (configurado)" || aviso "Registros solo en RAM" "Se pierden al reiniciar"; }
+
+echo
+echo "2. Red 4G (Claro)"
+if ip -4 addr show usb0 2>/dev/null | grep -q inet; then ok "Módem 4G conectado (usb0)"; else mal "usb0 sin IP" "Revisar módulo 4G y journalctl -u NetworkManager"; fi
+SALIDA=$(ip route get 1.1.1.1 2>/dev/null | grep -o 'dev [^ ]*' | cut -d' ' -f2)
+[ "$SALIDA" = "usb0" ] && ok "Internet sale por el 4G" || aviso "Internet sale por $SALIDA, no por el 4G" "Normal si el wifi está encendido; en El Trigal debe ser usb0"
+R4=$(curl -4 --interface usb0 -s -o /dev/null -m 15 -w "%{http_code}" $CHECK_URL)
+R6=$(curl -6 --interface usb0 -s -o /dev/null -m 15 -w "%{http_code}" $CHECK_URL)
+[ "$R4" = "204" ] && ok "IPv4 por 4G" || { [ "$R4" = "302" ] && mal "IPv4 por 4G redirigido (302)" "Plan de datos agotado: recargar en Mi Claro" || mal "IPv4 por 4G no responde ($R4)"; }
+[ "$R6" = "204" ] && ok "IPv6 por 4G" || { [ "$R6" = "302" ] && mal "IPv6 por 4G redirigido (302)" "Plan de datos agotado: recargar en Mi Claro" || aviso "IPv6 por 4G no responde ($R6)"; }
+systemctl is-active --quiet lte-watchdog.timer && ok "Vigilante del 4G activo" || mal "Vigilante del 4G inactivo" "sudo systemctl enable --now lte-watchdog.timer"
+N=$(journalctl -t lte-watchdog --since "-2h" --no-pager 2>/dev/null | grep -c "reiniciando modulo")
+[ "$N" -eq 0 ] && ok "El vigilante no ha reiniciado el módulo en 2 h" || aviso "El vigilante reinició el módulo $N veces en 2 h" "journalctl -t lte-watchdog --since -2h"
+if command -v vnstat >/dev/null; then
+  HOY=$(vnstat -i usb0 --oneline 2>/dev/null | cut -d';' -f6)
+  [ -n "$HOY" ] && ok "Consumo 4G de hoy: $HOY" || aviso "vnstat aún sin datos de usb0"
+fi
+
+echo
+echo "3. Contenedores y servicios"
+for C in mosquitto node-red influxdb grafana cloudflared portainer; do
+  [ "$(docker inspect -f '{{.State.Running}}' $C 2>/dev/null)" = "true" ] && ok "Contenedor $C" || mal "Contenedor $C detenido" "docker start $C"
+done
+for S in trigal-serial camara vnstat; do
+  systemctl is-active --quiet $S && ok "Servicio $S" || mal "Servicio $S detenido" "journalctl -u $S -n 30"
+done
+for TM in fotos-nube.timer metricas-sistema.timer; do
+  if systemctl list-unit-files "$TM" >/dev/null 2>&1 && systemctl cat "$TM" >/dev/null 2>&1; then
+    systemctl is-active --quiet "$TM" && ok "Temporizador $TM" || mal "Temporizador $TM inactivo" "sudo systemctl enable --now $TM"
+  else
+    aviso "No está instalado $TM"
+  fi
+done
+
+echo
+echo "4. Datos de la estación (ESP32 → MQTT → Node-RED → InfluxDB)"
+[ -e /dev/esp32 ] && ok "ESP32 conectada (/dev/esp32)" || mal "No aparece /dev/esp32" "Revisar cable USB de la ESP32 (puerto UART)"
+N=$(journalctl -u trigal-serial --since "-30 min" --no-pager 2>/dev/null | grep -cE "no manda nada|Se perdió|No veo la ESP32")
+[ "$N" -eq 0 ] && ok "Puente serial sin cortes en 30 min" || aviso "El puente tuvo $N avisos en 30 min" "journalctl -u trigal-serial --since -30min"
+DATOS=$(campos_influx datos 5)
+for F in temp_caja temperatura humedad co2 lux par; do
+  echo "$DATOS" | grep -q "^$F [1-9]" && ok "Llega $F (últimos 5 min)" || mal "No llega $F en 5 min"
+done
+SUELO=$(campos_influx datos 20)
+echo "$SUELO" | grep -q "^s1_humedad [1-9]" && ok "Llegan datos de suelo (últimos 20 min)" || mal "No llegan datos de suelo en 20 min" "Las sondas envían cada 15 min"
+echo "$DATOS" | grep -q "^dpv [1-9]" && ok "Node-RED calcula el DPV" || aviso "No hay DPV en 5 min" "Revisar el flujo de Node-RED"
+SIS=$(campos_influx sistema 15)
+echo "$SIS" | grep -q "^disco_uso_pct [1-9]" && ok "Llegan métricas del sistema" || aviso "No hay métricas del sistema en 15 min" "Revisar metricas-sistema.timer"
+TID=$(docker exec influxdb influx task list --hide-headers 2>/dev/null | awk '/indices_diarios/{print $1; exit}')
+if [ -n "$TID" ]; then
+  RUN=$(docker exec influxdb influx task run list --task-id "$TID" --limit 1 --hide-headers 2>/dev/null)
+  echo "$RUN" | grep -q success && ok "Última ejecución de indices_diarios: success" || aviso "Última ejecución de indices_diarios no fue exitosa" "InfluxDB → Tasks → indices_diarios → Runs"
+else
+  aviso "No encontré la tarea indices_diarios"
+fi
+
+echo
+echo "5. Cámara y fotos"
+EST=$(curl -s -m 5 http://localhost:3333/foto/estado)
+if [ -n "$EST" ]; then
+  ok "Servidor de cámara responde (3333)"
+  echo "$EST" | grep -q '"conectado"' && ok "Cámara conectada a Mosquitto" || aviso "Cámara sin MQTT" "journalctl -u camara -n 30"
+else
+  mal "Servidor de cámara no responde" "journalctl -u camara -n 30"
+fi
+ULT=$(find ~/fotos -name '*.jpg' -printf '%T@ %f\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2)
+[ -n "$ULT" ] && ok "Última foto en microSD: $ULT" || aviso "No hay fotos en ~/fotos" "Normal si se borraron; la próxima automática es a las 4:00, 12:00 o 20:00"
+RES=$(systemctl show fotos-nube -p Result --value 2>/dev/null)
+[ "$RES" = "success" ] && ok "Última subida a Drive sin errores" || aviso "Última subida a Drive: $RES" "journalctl -u fotos-nube -n 20"
+
+echo
+echo "6. Acceso remoto"
+REG=$(docker logs --since 30m cloudflared 2>&1 | grep -c "Registered tunnel connection")
+ERRT=$(docker logs --since 10m cloudflared 2>&1 | grep -c "ERR")
+[ "$ERRT" -eq 0 ] && ok "Túnel sin errores en 10 min ($REG conexiones nuevas en 30 min)" || aviso "Túnel con $ERRT errores en 10 min" "docker logs --since 10m cloudflared"
+P=$(curl -s -o /dev/null -m 20 -w "%{http_code}" $URL_PUBLICA/api/health)
+case "$P" in
+  200) ok "$URL_PUBLICA responde (Grafana)";;
+  530) mal "$URL_PUBLICA da Error 1033 (túnel caído)" "docker logs --since 10m cloudflared";;
+  502) mal "$URL_PUBLICA da 502 (Grafana no responde)" "docker restart grafana";;
+  *)   mal "$URL_PUBLICA no responde ($P)";;
+esac
+D=$(curl -s -o /dev/null -m 20 -w "%{http_code}" $URL_PUBLICA/descarga)
+[ "$D" = "401" ] && ok "/descarga publicada y protegida con usuario" || aviso "/descarga responde $D (esperado 401)"
+if command -v rpi-connect >/dev/null; then
+  RC=$(rpi-connect status 2>/dev/null)
+  echo "$RC" | grep -qi "signed in: yes" && ok "Raspberry Pi Connect con sesión iniciada" || mal "Raspberry Pi Connect sin sesión" "rpi-connect signin"
+  echo "$RC" | grep -qi "subscribed to events: yes" && ok "Raspberry Pi Connect en línea" || mal "Raspberry Pi Connect desconectado" "rpi-connect restart"
+else
+  aviso "No encontré rpi-connect"
+fi
+
+echo
+echo "Resumen: ✅ $OK   ⚠️  $AVISO   ❌ $MAL"
+[ "$MAL" -eq 0 ] && echo "Todo lo esencial está funcionando." || echo "Revisar los ❌ de arriba."
+exit $MAL

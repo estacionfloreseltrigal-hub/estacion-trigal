@@ -1,0 +1,119 @@
+#!/usr/bin/env python3
+"""
+Métricas de la Raspberry Pi de la estación Trigal -> InfluxDB (tabla "sistema").
+Lo ejecuta metricas-sistema.timer cada 5 minutos.
+
+Campos que guarda:
+    datos_hoy_mb     consumo del 4G (usb0) hoy, en MB (bajada + subida), según vnstat
+    datos_mes_mb     consumo del 4G en el mes calendario, en MB
+    disco_uso_pct    porcentaje usado de la microSD
+    disco_libre_gb   espacio libre de la microSD, en GB
+    temp_cpu         temperatura del procesador, en °C
+    bajo_voltaje     1 si hubo bajo voltaje desde que arrancó la Pi, 0 si no
+
+Configuración en /opt/trigal/app/influx-sistema.env:
+    INFLUX_TOKEN=el_token_con_permiso_de_escritura
+    (opcionales) INFLUX_URL=http://localhost:8086  INFLUX_ORG=trigal  INFLUX_BUCKET=estacion  IFACE_4G=usb0
+"""
+import datetime
+import json
+import shutil
+import subprocess
+import sys
+import urllib.request
+
+RUTA_ENV = "/opt/trigal/app/influx-sistema.env"
+
+
+def cargar_env(ruta):
+    conf = {}
+    try:
+        with open(ruta, encoding="utf-8") as f:
+            for linea in f:
+                linea = linea.strip()
+                if linea and not linea.startswith("#") and "=" in linea:
+                    k, v = linea.split("=", 1)
+                    conf[k.strip()] = v.strip().strip('"').strip("'")
+    except OSError:
+        pass
+    return conf
+
+
+def consumo_4g(interfaz):
+    """Devuelve (MB de hoy, MB del mes) de la interfaz según vnstat, o (None, None)."""
+    try:
+        salida = subprocess.run(["vnstat", "--json", "-i", interfaz],
+                                capture_output=True, text=True, timeout=20).stdout
+        trafico = json.loads(salida)["interfaces"][0]["traffic"]
+    except (OSError, ValueError, KeyError, IndexError, subprocess.SubprocessError):
+        return None, None
+
+    hoy = datetime.date.today()
+
+    def megas(entradas, es_actual):
+        for e in entradas:
+            if es_actual(e["date"]):
+                return round((e["rx"] + e["tx"]) / 1e6, 2)
+        return 0.0
+
+    dia = megas(trafico.get("day", []),
+                lambda d: (d["year"], d["month"], d.get("day")) == (hoy.year, hoy.month, hoy.day))
+    mes = megas(trafico.get("month", []),
+                lambda d: (d["year"], d["month"]) == (hoy.year, hoy.month))
+    return dia, mes
+
+
+def temperatura_cpu():
+    try:
+        with open("/sys/class/thermal/thermal_zone0/temp") as f:
+            return round(int(f.read().strip()) / 1000, 1)
+    except (OSError, ValueError):
+        return None
+
+
+def hubo_bajo_voltaje():
+    """1 si vcgencmd reporta bajo voltaje (ahora o desde el arranque), 0 si no."""
+    try:
+        salida = subprocess.run(["vcgencmd", "get_throttled"],
+                                capture_output=True, text=True, timeout=10).stdout
+        valor = int(salida.strip().split("=")[1], 16)
+        return 1 if valor & 0x10001 else 0
+    except (OSError, ValueError, IndexError, subprocess.SubprocessError):
+        return None
+
+
+def main():
+    conf = cargar_env(RUTA_ENV)
+    token = conf.get("INFLUX_TOKEN")
+    if not token:
+        sys.exit(f"Falta INFLUX_TOKEN en {RUTA_ENV}")
+    url = conf.get("INFLUX_URL", "http://localhost:8086")
+    org = conf.get("INFLUX_ORG", "trigal")
+    bucket = conf.get("INFLUX_BUCKET", "estacion")
+    interfaz = conf.get("IFACE_4G", "usb0")
+
+    disco = shutil.disk_usage("/")
+    datos_hoy, datos_mes = consumo_4g(interfaz)
+    campos = {
+        "datos_hoy_mb": datos_hoy,
+        "datos_mes_mb": datos_mes,
+        "disco_uso_pct": round(disco.used / disco.total * 100, 1),
+        "disco_libre_gb": round(disco.free / 1e9, 2),
+        "temp_cpu": temperatura_cpu(),
+        "bajo_voltaje": hubo_bajo_voltaje(),
+    }
+    linea = "sistema " + ",".join(f"{k}={float(v)}" for k, v in campos.items() if v is not None)
+
+    pedido = urllib.request.Request(
+        f"{url}/api/v2/write?org={org}&bucket={bucket}&precision=s",
+        data=linea.encode(), method="POST",
+        headers={"Authorization": f"Token {token}", "Content-Type": "text/plain; charset=utf-8"})
+    try:
+        urllib.request.urlopen(pedido, timeout=15)
+    except Exception as e:
+        sys.exit(f"No se pudo escribir en InfluxDB: {e}")
+    print(linea)
+
+
+if __name__ == "__main__":
+    main()

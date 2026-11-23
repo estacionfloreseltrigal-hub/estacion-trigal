@@ -1,0 +1,10 @@
+# mosquitto
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: mosquitto
+    restart: unless-stopped
+    ports: ["1883:1883"]
+    volumes:
+      - /opt/trigal/mosquitto/config:/mosquitto/config
+      - /opt/trigal/mosquitto/data:/mosquitto/data

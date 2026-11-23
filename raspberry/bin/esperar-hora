@@ -1,0 +1,15 @@
+#!/bin/bash
+# Espera a que la Raspberry tenga la hora sincronizada por internet (4G) antes de
+# arrancar el puente serial. La Pi no tiene reloj propio: al prender sin red arranca
+# con la hora del último apagado y las lecturas quedarían con fechas equivocadas.
+# Mientras espera no se guarda nada; apenas sincroniza, arranca normal.
+
+minutos=0
+until [ "$(timedatectl show -p NTPSynchronized --value)" = "yes" ]; do
+    if [ $((minutos % 5)) -eq 0 ]; then
+        echo "Esperando hora por internet ($minutos min). Hora actual de la Pi: $(date '+%F %T')"
+    fi
+    sleep 60
+    minutos=$((minutos + 1))
+done
+echo "Hora sincronizada: $(date '+%F %T')"
